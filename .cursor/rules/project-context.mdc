@@ -7,7 +7,7 @@ alwaysApply: true
 
 ## Overview
 
-A hiring platform that uses voice AI interviews (Deepgram) to match startup founders with candidates. Founders describe what they need; candidates get a tailored behavioral + system design interview. Founders see a ranked dashboard of potential hires and can trigger a mutual intro email.
+A hiring platform that uses voice AI interviews (Vapi.ai) to match startup founders with candidates. Founders describe what they need; candidates get a tailored behavioral + system design interview. Founders see a ranked dashboard of potential hires and can trigger a mutual intro email.
 
 ---
 
@@ -16,7 +16,7 @@ A hiring platform that uses voice AI interviews (Deepgram) to match startup foun
 - **Frontend:** Next.js 14+ (App Router), TypeScript, Tailwind CSS, shadcn/ui
 - **Backend:** Next.js API routes + Server Actions
 - **Database & Auth:** Supabase (Postgres, Auth, Row Level Security, Edge Functions)
-- **Voice AI:** Deepgram (STT/TTS) + Claude API (conversation orchestration)
+- **Voice AI:** Vapi.ai (managed voice AI platform — handles STT, TTS, and Claude conversation orchestration)
 - **Email:** Resend (transactional emails)
 - **Deployment:** Vercel
 - **State/Realtime:** Supabase Realtime (dashboard updates)
@@ -173,14 +173,16 @@ lib/supabase/middleware.ts
 
 **Flow:**
 1. Founder clicks "Start Interview"
-2. Browser opens WebSocket to Deepgram for real-time STT
-3. Claude API orchestrates the conversation (system prompt below)
-4. Deepgram TTS speaks Claude's questions back
-5. Interview lasts ~5-7 min, AI wraps up naturally
-6. On end: full transcript → Claude extraction → save `founder_profiles` row
+2. Frontend creates a Vapi web call with the founder interview assistant config (Claude as model, system prompt below)
+3. Vapi handles the entire voice loop — STT, Claude conversation, TTS, interruptions, endpointing
+4. Interview lasts ~5-7 min, AI wraps up naturally
+5. On call end: Vapi sends end-of-call webhook with full transcript to our API route
+6. Server runs Claude extraction on transcript → saves `founder_profiles` row
 
-**Claude System Prompt (Founder Interview):**
+**Vapi Assistant Config (Founder Interview):**
 ```
+Provider: anthropic (Claude)
+System prompt:
 You are interviewing a startup founder to understand their hiring needs.
 Keep it conversational, ~5 minutes. Cover:
 1. What role are you hiring for? Title and responsibilities.
@@ -196,7 +198,7 @@ like "good communicator" — dig into what that means for them.
 When you have enough info, thank them and wrap up.
 ```
 
-**Claude Extraction Prompt (post-interview):**
+**Claude Extraction Prompt (post-interview, server-side):**
 ```
 Given this transcript of a founder interview, extract structured JSON:
 {
@@ -214,28 +216,33 @@ Be precise. Only include skills explicitly mentioned or clearly implied.
 
 **Key files:**
 ```
-app/founder/interview/page.tsx          -- interview UI
-app/api/interview/founder/route.ts      -- websocket/orchestration
-lib/deepgram/client.ts                  -- Deepgram STT/TTS helpers
+app/founder/interview/page.tsx          -- interview UI (Vapi Web SDK call)
+app/api/interview/founder/route.ts      -- webhook handler (end-of-call transcript)
+lib/vapi/client.ts                      -- Vapi Web SDK wrapper
+lib/vapi/assistants.ts                  -- assistant configurations
 lib/interview/founder-prompts.ts        -- system prompts
 lib/interview/extract-founder.ts        -- Claude structured extraction
 ```
 
 ---
 
-### Module 3: Candidate Interview (Voice AI — 2 Phases)
+### Module 3: Candidate Interview (Voice AI — 2 Phases, 2 Vapi Calls)
 
 **Path:** `/app/candidate/interview/`
 
-**Flow:**
+**Flow:** The candidate interview runs as two separate Vapi calls with a server-side processing step in between.
 
-#### Phase 1 — Behavioral (~3-5 min)
-1. AI asks about background, experience, skills, work preferences
-2. Goal: build a candidate profile (skills, strengths, level)
-3. AI probes for depth — not just "I know React" but "tell me about a complex React project"
+#### Phase 1 — Behavioral (~3-5 min) [Vapi Call 1]
+1. Frontend starts a Vapi web call with the behavioral assistant config
+2. AI asks about background, experience, skills, work preferences
+3. Goal: build a candidate profile (skills, strengths, level)
+4. AI probes for depth — not just "I know React" but "tell me about a complex React project"
+5. On call end: Vapi sends end-of-call webhook with Phase 1 transcript
 
-**Claude System Prompt (Candidate Behavioral):**
+**Vapi Assistant Config (Candidate Behavioral):**
 ```
+Provider: anthropic (Claude)
+System prompt:
 You are conducting a behavioral interview for a tech candidate.
 Keep it conversational, ~4 minutes. Cover:
 1. Walk me through your background briefly.
@@ -247,13 +254,16 @@ Keep it conversational, ~4 minutes. Cover:
 
 Dig deeper on technical claims. If they say "I know TypeScript",
 ask about specific patterns, challenges, or projects.
-Transition naturally to Phase 2 when you have enough.
+When you have enough info, wrap up and let them know
+the next part will begin shortly.
 ```
 
-#### Phase 2 — System Design (~3-5 min)
-1. Based on Phase 1 profile + matching founder requirements, Claude generates a contextual system design question
-2. The question tests real understanding, not memorized answers
-3. AI follows up on their design with probing questions
+#### Between Phases (server-side, ~5-10 seconds)
+1. Server receives Phase 1 transcript via webhook
+2. Quick Claude API call extracts candidate skills from Phase 1
+3. Server loads relevant `founder_profiles` from DB (where skills overlap)
+4. Claude generates a contextual system design question
+5. Server signals frontend that Phase 2 is ready with the generated question
 
 **Question Generation Logic:**
 ```
@@ -274,17 +284,23 @@ is building a real-time collaboration tool:
 How would you handle conflict resolution and offline support?"
 ```
 
-**After interview:**
-- Full transcript → Claude evaluation → save `candidate_profiles` row
+#### Phase 2 — System Design (~3-5 min) [Vapi Call 2]
+1. Frontend starts a second Vapi web call with the system design assistant config (generated question baked into the system prompt)
+2. AI presents the system design question and probes the candidate's design
+3. On call end: Vapi sends end-of-call webhook with Phase 2 transcript
+
+**After both phases complete:**
+- Server combines both transcripts → Claude evaluation → save `candidate_profiles` row
 - Trigger matching pipeline (Module 5)
 
 **Key files:**
 ```
 app/candidate/interview/page.tsx
-app/api/interview/candidate/route.ts
+app/api/interview/candidate/route.ts    -- webhook handler for both phases
+lib/vapi/assistants.ts                   -- assistant configs for both phases
 lib/interview/candidate-prompts.ts
-lib/interview/question-generator.ts     -- contextual system design Q
-lib/interview/evaluate-candidate.ts     -- Claude scoring
+lib/interview/question-generator.ts      -- contextual system design Q (Claude API)
+lib/interview/evaluate-candidate.ts      -- Claude scoring (post-interview)
 ```
 
 ---
@@ -429,23 +445,29 @@ lib/email/templates/candidate-intro.tsx
 
 ## Voice Interview Implementation Notes
 
-### Deepgram Integration Pattern
+### Vapi Integration Pattern
 
 ```
-Browser Mic → Deepgram STT (WebSocket) → text
-                                           ↓
-                               Claude API (conversation turn)
-                                           ↓
-                                      response text
-                                           ↓
-                          Deepgram TTS (REST or WS) → audio → Browser Speaker
+Browser → Vapi Web SDK (WebRTC) → Vapi Cloud
+                                     ↓
+                    Vapi orchestrates: STT → Claude → TTS
+                                     ↓
+                    Audio streamed back → Browser Speaker
+
+On call end:
+  Vapi → end-of-call webhook → Our API route
+                                     ↓
+                    Post-processing (extraction / evaluation)
+                                     ↓
+                              Save to Supabase
 ```
 
-- Use Deepgram's `nova-2` model for STT
-- Use Deepgram's Aura for TTS
-- Maintain conversation history in-memory during interview
-- On interview end, flush full transcript to DB
-- Handle interruptions gracefully (stop TTS if user starts talking)
+- Vapi handles STT, TTS, and LLM orchestration as a managed service
+- Claude (Anthropic) is set as the model provider in the assistant config
+- Vapi natively handles: interruptions (barge-in), endpointing, background noise filtering, backchanneling
+- Transcripts are received via end-of-call webhooks — no manual transcript assembly
+- Frontend uses `@vapi-ai/web` SDK to start/stop calls and listen for events
+- Configure `artifactPlan` with `transcriptPlan.enabled: true` to receive full transcripts
 
 ### Anti-Cheating Measures (Candidate Interview)
 - System design questions are dynamically generated (not from a bank)
@@ -488,9 +510,9 @@ Browser Mic → Deepgram STT (WebSocket) → text
 │   │   ├── client.ts
 │   │   ├── server.ts
 │   │   └── middleware.ts
-│   ├── deepgram/
-│   │   ├── stt.ts
-│   │   └── tts.ts
+│   ├── vapi/
+│   │   ├── client.ts
+│   │   └── assistants.ts
 │   ├── interview/
 │   │   ├── founder-prompts.ts
 │   │   ├── candidate-prompts.ts
@@ -513,7 +535,7 @@ Browser Mic → Deepgram STT (WebSocket) → text
 ├── components/
 │   ├── ui/                             -- shadcn components
 │   ├── interview/
-│   │   ├── voice-recorder.tsx
+│   │   ├── vapi-call.tsx
 │   │   ├── interview-ui.tsx
 │   │   └── transcript-display.tsx
 │   └── dashboard/
@@ -535,8 +557,9 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 
-# Deepgram
-DEEPGRAM_API_KEY=
+# Vapi (voice AI platform)
+VAPI_API_KEY=
+NEXT_PUBLIC_VAPI_PUBLIC_KEY=
 
 # Claude / Anthropic
 ANTHROPIC_API_KEY=
@@ -557,8 +580,8 @@ RESEND_FROM_EMAIL=hello@foundermatch.com
 4. [ ] Basic layout and navigation
 
 ### Phase 2 — Founder Flow
-5. [ ] Deepgram STT/TTS integration (standalone test page)
-6. [ ] Founder interview page (voice UI + Claude orchestration)
+5. [ ] Vapi Web SDK integration (standalone test page)
+6. [ ] Founder interview page (Vapi call + assistant config)
 7. [ ] Founder profile extraction and DB storage
 8. [ ] Founder dashboard (static/mock data first)
 
