@@ -1,0 +1,19 @@
+---
+description: Rules for making changes to the Supabase database
+alwaysApply: true
+---
+
+# Supabase Change Policy
+
+**NEVER** make changes to the Supabase database without explicit user approval first. This includes:
+
+- Creating, altering, or dropping tables
+- Adding, modifying, or removing columns
+- Changing RLS policies
+- Running migrations (`apply_migration`)
+- Executing DDL via `execute_sql`
+- Deploying or modifying edge functions
+
+Before any database change, **describe the exact change** you want to make and **ask for confirmation**. Multiple people work on this project and everyone needs to be aware of schema changes.
+
+Read-only queries (SELECT) are fine without asking.

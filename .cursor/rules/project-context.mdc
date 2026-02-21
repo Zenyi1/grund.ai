@@ -1,3 +1,8 @@
+---
+description: FounderMatch platform spec — tech stack, schema, modules, prompts, build order
+alwaysApply: true
+---
+
 # FounderMatch — Platform Specification
 
 ## Overview
@@ -94,7 +99,7 @@ create table public.match_scores (
   candidate_profile_id uuid references public.candidate_profiles(id) on delete cascade,
   skill_match_score numeric(3,1),             -- 0-10 how well skills align
   experience_match_score numeric(3,1),        -- 0-10 seniority fit
-  culture_match_score numeric(3,1),           -- 0-10 soft factors
+  culture_match_score numeric(3,1),          -- 0-10 soft factors
   technical_score numeric(3,1),               -- from candidate interview
   overall_match_score numeric(3,1),           -- weighted composite using founder's weights
   created_at timestamptz default now(),
@@ -538,7 +543,7 @@ On call end:
 │       └── skill-tags.tsx
 ├── .env.local.example
 ├── package.json
-├── claude.md                           -- this file
+├── context.md
 └── README.md
 ```
 
@@ -568,17 +573,17 @@ RESEND_FROM_EMAIL=hello@foundermatch.com
 
 ## Build Order (Recommended)
 
-### Phase 1 — Foundation ✅
-1. [x] Init Next.js + Tailwind + shadcn
-2. [x] Supabase project setup + run migrations
-3. [x] Auth flow (signup/login/onboarding with role selection)
-4. [x] Basic layout and navigation
+### Phase 1 — Foundation
+1. [ ] Init Next.js + Tailwind + shadcn
+2. [ ] Supabase project setup + run migrations
+3. [ ] Auth flow (signup/login/onboarding with role selection)
+4. [ ] Basic layout and navigation
 
 ### Phase 2 — Founder Flow
 5. [ ] Vapi Web SDK integration (standalone test page)
 6. [ ] Founder interview page (Vapi call + assistant config)
 7. [ ] Founder profile extraction and DB storage
-8. [x] Founder dashboard (weighted match ranking, top 5, connect flow)
+8. [ ] Founder dashboard (static/mock data first)
 
 ### Phase 3 — Candidate Flow
 9. [ ] Candidate interview Phase 1 (behavioral)
