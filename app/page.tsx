@@ -1,12 +1,11 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export default function LandingPage() {
   return (
     <main className="min-h-screen flex flex-col items-center justify-center bg-white px-4">
       <div className="max-w-2xl text-center space-y-6">
-        <h1 className="text-5xl font-bold tracking-tight text-gray-900">
-          cracked.ai
-        </h1>
+        <Image src="/logo.svg" alt="cracked" width={310} height={60} priority className="mx-auto" />
         <p className="text-xl text-gray-500">
           Voice AI interviews that match startup founders with exceptional candidates.
         </p>

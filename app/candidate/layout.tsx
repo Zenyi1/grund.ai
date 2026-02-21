@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/(auth)/actions";
@@ -29,7 +30,9 @@ export default async function CandidateLayout({
     <div className="min-h-screen bg-gray-50">
       <nav className="border-b bg-white px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <span className="font-bold text-gray-900">cracked.ai</span>
+          <Link href="/candidate/interview">
+            <Image src="/logo.svg" alt="cracked" width={140} height={28} priority />
+          </Link>
           <div className="hidden sm:flex items-center gap-1 ml-4">
             <Link
               href="/candidate/interview"
