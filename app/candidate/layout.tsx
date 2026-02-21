@@ -27,7 +27,7 @@ export default async function CandidateLayout({
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="border-b bg-white px-6 py-3 flex items-center justify-between">
-        <span className="font-bold text-gray-900">FounderMatch</span>
+        <span className="font-bold text-gray-900">cracked.ai</span>
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-600">{candidate.full_name}</span>
           <form action={signOut}>

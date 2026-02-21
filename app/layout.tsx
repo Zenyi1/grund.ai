@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "FounderMatch",
-  description: "Match startup founders with the right candidates via voice AI interviews.",
+  title: "cracked.ai",
+  description: "Voice AI interviews that match startup founders with exceptional candidates.",
 };
 
 export default function RootLayout({

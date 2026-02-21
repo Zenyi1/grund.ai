@@ -1,6 +1,6 @@
 # Founder Track — Developer Guide
 
-End-to-end flow for the founder side of FounderMatch: from signup through voice interview to the ranked candidate dashboard.
+End-to-end flow for the founder side of cracked.ai: from signup through voice interview to the ranked candidate dashboard.
 
 ---
 

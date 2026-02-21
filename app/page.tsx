@@ -5,7 +5,7 @@ export default function LandingPage() {
     <main className="min-h-screen flex flex-col items-center justify-center bg-white px-4">
       <div className="max-w-2xl text-center space-y-6">
         <h1 className="text-5xl font-bold tracking-tight text-gray-900">
-          FounderMatch
+          cracked.ai
         </h1>
         <p className="text-xl text-gray-500">
           Voice AI interviews that match startup founders with exceptional candidates.

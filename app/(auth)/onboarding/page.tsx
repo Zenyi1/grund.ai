@@ -25,7 +25,7 @@ export default function OnboardingPage() {
   return (
     <div className="w-full max-w-lg space-y-6">
       <div className="text-center">
-        <h1 className="text-3xl font-bold text-gray-900">Welcome to FounderMatch</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Welcome to cracked.ai</h1>
         <p className="mt-2 text-gray-500">Let&apos;s set up your profile. Who are you?</p>
       </div>
 

@@ -23,7 +23,7 @@ export default function SignupPage() {
       <CardHeader className="space-y-1">
         <CardTitle className="text-2xl font-bold">Create an account</CardTitle>
         <CardDescription>
-          Join FounderMatch as a founder or candidate.
+          Join cracked.ai as a founder or candidate.
         </CardDescription>
       </CardHeader>
 

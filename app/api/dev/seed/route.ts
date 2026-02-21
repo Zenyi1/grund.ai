@@ -18,7 +18,7 @@ import { createClient, createAdminClient } from "@/lib/supabase/server";
 const TEST_CANDIDATES = [
   {
     id: "cc000000-0000-0000-0000-000000000001",
-    email: "alice.chen@foundermatch.dev",
+    email: "alice.chen@cracked.ai",
     name: "Alice Chen",
     linkedin_url: "https://linkedin.com/in/alicechen-dev",
     profile: {
@@ -49,7 +49,7 @@ const TEST_CANDIDATES = [
   },
   {
     id: "cc000000-0000-0000-0000-000000000002",
-    email: "david.kim@foundermatch.dev",
+    email: "david.kim@cracked.ai",
     name: "David Kim",
     linkedin_url: "https://linkedin.com/in/davidkim-eng",
     profile: {
@@ -80,7 +80,7 @@ const TEST_CANDIDATES = [
   },
   {
     id: "cc000000-0000-0000-0000-000000000003",
-    email: "carol.thompson@foundermatch.dev",
+    email: "carol.thompson@cracked.ai",
     name: "Carol Thompson",
     linkedin_url: null,
     profile: {
@@ -110,7 +110,7 @@ const TEST_CANDIDATES = [
   },
   {
     id: "cc000000-0000-0000-0000-000000000004",
-    email: "bob.martinez@foundermatch.dev",
+    email: "bob.martinez@cracked.ai",
     name: "Bob Martinez",
     linkedin_url: "https://linkedin.com/in/bobmartinez-fe",
     profile: {
@@ -141,7 +141,7 @@ const TEST_CANDIDATES = [
   },
   {
     id: "cc000000-0000-0000-0000-000000000005",
-    email: "emma.wilson@foundermatch.dev",
+    email: "emma.wilson@cracked.ai",
     name: "Emma Wilson",
     linkedin_url: null,
     profile: {
@@ -265,7 +265,7 @@ async function runCandidateSeed(
       await admin.auth.admin.createUser({
         id: seed.id,
         email: seed.email,
-        password: "foundermatch-seed-2024!",
+        password: "cracked-seed-2024!",
         email_confirm: true,
         user_metadata: { full_name: seed.name },
       });

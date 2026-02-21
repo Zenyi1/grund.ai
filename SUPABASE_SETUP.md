@@ -1,6 +1,6 @@
-# Supabase Setup — FounderMatch
+# Supabase Setup — cracked.ai
 
-This document is the single source of truth for connecting to the FounderMatch Supabase backend. Any Claude Code instance or developer can use this to connect.
+This document is the single source of truth for connecting to the cracked.ai Supabase backend. Any Claude Code instance or developer can use this to connect.
 
 ---
 
@@ -8,7 +8,7 @@ This document is the single source of truth for connecting to the FounderMatch S
 
 | Field | Value |
 |-------|-------|
-| **Project name** | FounderMatch |
+| **Project name** | cracked.ai |
 | **Project ID** | `vzjxalakudkqovfygmjw` |
 | **Region** | us-east-1 |
 | **Organization** | Zenyi1's (`oqqgeklciqqgytttyxre`) |
