@@ -89,7 +89,7 @@ export async function completeOnboarding(_: unknown, formData: FormData) {
   const role = formData.get("role") as string;
 
   if (role === "founder") {
-    const { error } = await supabase.from("founders").insert({
+    const { error } = await supabase.from("founders").upsert({
       id: user.id,
       full_name: formData.get("full_name") as string,
       company_name: formData.get("company_name") as string,
@@ -101,7 +101,7 @@ export async function completeOnboarding(_: unknown, formData: FormData) {
   }
 
   if (role === "candidate") {
-    const { error } = await supabase.from("candidates").insert({
+    const { error } = await supabase.from("candidates").upsert({
       id: user.id,
       full_name: formData.get("full_name") as string,
       email: user.email!,
