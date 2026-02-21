@@ -124,6 +124,7 @@ export function CandidateInterviewClient({
       {/* Phase 1: Behavioral */}
       {phase === "phase1" && (
         <VapiCall
+          key="phase1"
           assistantConfig={phase1Config}
           onCallEnd={handlePhase1End}
         />
@@ -153,6 +154,7 @@ export function CandidateInterviewClient({
       {/* Phase 2: System Design */}
       {phase === "phase2" && systemDesignQuestion && (
         <VapiCall
+          key="phase2"
           assistantConfig={(() => {
             const config =
               getCandidateSystemDesignAssistant(systemDesignQuestion);

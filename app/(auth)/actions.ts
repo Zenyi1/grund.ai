@@ -19,18 +19,24 @@ export async function login(_: unknown, formData: FormData) {
   } = await supabase.auth.getUser();
 
   if (user) {
-    const { data: founder } = await supabase
+    const { data: founder, error: founderError } = await supabase
       .from("founders")
       .select("id")
       .eq("id", user.id)
       .single();
+    if (founderError && founderError.code !== "PGRST116") {
+      console.error("Login: founder check failed:", founderError);
+    }
     if (founder) redirect("/founder/dashboard");
 
-    const { data: candidate } = await supabase
+    const { data: candidate, error: candidateError } = await supabase
       .from("candidates")
       .select("id")
       .eq("id", user.id)
       .single();
+    if (candidateError && candidateError.code !== "PGRST116") {
+      console.error("Login: candidate check failed:", candidateError);
+    }
     if (candidate) redirect("/candidate/interview");
   }
 
@@ -63,6 +69,22 @@ export async function completeOnboarding(_: unknown, formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  // If a profile already exists (e.g. user navigated back to /onboarding),
+  // just redirect to the right place instead of attempting a duplicate insert.
+  const { data: existingFounder } = await supabase
+    .from("founders")
+    .select("id")
+    .eq("id", user.id)
+    .single();
+  if (existingFounder) redirect("/founder/dashboard");
+
+  const { data: existingCandidate } = await supabase
+    .from("candidates")
+    .select("id")
+    .eq("id", user.id)
+    .single();
+  if (existingCandidate) redirect("/candidate/interview");
 
   const role = formData.get("role") as string;
 

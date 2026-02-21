@@ -24,7 +24,16 @@ export function VapiCall({ assistantConfig, onCallEnd }: VapiCallProps) {
   const [isMuted, setIsMuted] = useState(false);
   const [volumeLevel, setVolumeLevel] = useState(0);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
-  const listenersAttached = useRef(false);
+
+  // Keep onCallEnd in a ref so the stable effect closure always has the latest version
+  const onCallEndRef = useRef(onCallEnd);
+  useEffect(() => {
+    onCallEndRef.current = onCallEnd;
+  }, [onCallEnd]);
+
+  // Track whether this component instance actually started a call.
+  // Prevents leftover "call-end" events from a previous phase from firing onCallEnd.
+  const callStartedRef = useRef(false);
 
   const scrollToBottom = useCallback(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -35,52 +44,66 @@ export function VapiCall({ assistantConfig, onCallEnd }: VapiCallProps) {
   }, [transcript, scrollToBottom]);
 
   useEffect(() => {
-    if (listenersAttached.current) return;
-    listenersAttached.current = true;
-
     const vapi = getVapi();
 
-    vapi.on("call-start", () => {
+    const handleCallStart = () => {
+      callStartedRef.current = true;
       setStatus("active");
-    });
+    };
 
-    vapi.on("call-end", () => {
+    const handleCallEnd = () => {
+      // Ignore call-end if we never started — avoids picking up leftover events
+      // from the previous phase on the shared singleton Vapi instance
+      if (!callStartedRef.current) return;
       setStatus("ended");
-      onCallEnd?.();
-    });
+      onCallEndRef.current?.();
+    };
 
-    vapi.on("volume-level", (volume) => {
+    const handleVolumeLevel = (volume: number) => {
       setVolumeLevel(volume);
-    });
+    };
 
-    vapi.on("message", (message: Record<string, unknown>) => {
+    const handleMessage = (message: Record<string, unknown>) => {
       if (
         message.type === "transcript" &&
         message.transcriptType === "final"
       ) {
-        setTranscript((prev) => [
-          ...prev,
-          {
-            role: message.role as "assistant" | "user",
-            text: message.transcript as string,
-          },
-        ]);
+        const text = message.transcript as string;
+        const role = message.role as "assistant" | "user";
+        setTranscript((prev) => {
+          // Deduplicate: skip if the last entry is identical (StrictMode double-fire guard)
+          const last = prev[prev.length - 1];
+          if (last && last.role === role && last.text === text) return prev;
+          return [...prev, { role, text }];
+        });
       }
-    });
+    };
 
-    vapi.on("error", (error) => {
+    const handleError = (error: unknown) => {
       console.error("Vapi error:", error);
-    });
+    };
+
+    // Register named handlers so we can remove them precisely
+    vapi.on("call-start", handleCallStart);
+    vapi.on("call-end", handleCallEnd);
+    vapi.on("volume-level", handleVolumeLevel);
+    vapi.on("message", handleMessage);
+    vapi.on("error", handleError);
 
     return () => {
-      vapi.removeAllListeners();
-      listenersAttached.current = false;
+      // Remove only our handlers — don't wipe listeners from other components
+      vapi.off("call-start", handleCallStart);
+      vapi.off("call-end", handleCallEnd);
+      vapi.off("volume-level", handleVolumeLevel);
+      vapi.off("message", handleMessage);
+      vapi.off("error", handleError);
     };
-  }, [onCallEnd]);
+  }, []); // Empty deps: register once per component instance
 
   const startCall = async () => {
     setStatus("connecting");
     setTranscript([]);
+    callStartedRef.current = false; // reset before starting
     try {
       const vapi = getVapi();
       await vapi.start(assistantConfig);
@@ -220,8 +243,8 @@ export function VapiCall({ assistantConfig, onCallEnd }: VapiCallProps) {
       {status === "idle" && (
         <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center">
           <p className="text-gray-500 text-sm mb-2">
-            This interview takes about 5 minutes. You&apos;ll have a
-            conversation about the role you&apos;re hiring for.
+            This interview takes about 5 minutes total — a quick background
+            check followed by a technical challenge.
           </p>
           <p className="text-gray-400 text-xs">
             Make sure your microphone is enabled and you&apos;re in a quiet

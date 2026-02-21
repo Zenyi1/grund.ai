@@ -26,6 +26,9 @@ interface VapiEndOfCallReport {
   };
 }
 
+const FALLBACK_QUESTION =
+  "Design a URL shortener service like bit.ly. Walk me through your architecture, how you'd handle high traffic, and how you'd store and look up the mappings efficiently.";
+
 function extractTranscript(message: VapiEndOfCallReport["message"]): string {
   return (
     message.transcript ||
@@ -34,52 +37,53 @@ function extractTranscript(message: VapiEndOfCallReport["message"]): string {
   );
 }
 
+// Vapi expects a 200 response to acknowledge receipt.
+// Always return 200 — log errors internally rather than returning 4xx/5xx.
 export async function POST(request: NextRequest) {
+  let body: VapiEndOfCallReport;
+
   try {
-    const body = (await request.json()) as VapiEndOfCallReport;
-
-    if (body.message?.type !== "end-of-call-report") {
-      return NextResponse.json({ received: true });
-    }
-
-    const { message } = body;
-    const candidateId = message.call?.metadata?.candidateId;
-    const phase = message.call?.metadata?.phase;
-
-    if (!candidateId) {
-      console.error("No candidateId in call metadata");
-      return NextResponse.json(
-        { error: "Missing candidateId" },
-        { status: 400 }
-      );
-    }
-
-    const rawTranscript = extractTranscript(message);
-    if (!rawTranscript) {
-      console.error("No transcript in end-of-call report");
-      return NextResponse.json(
-        { error: "Missing transcript" },
-        { status: 400 }
-      );
-    }
-
-    const supabase = createAdminClient();
-
-    if (phase === "1") {
-      return await handlePhase1(supabase, candidateId, rawTranscript, message);
-    } else if (phase === "2") {
-      return await handlePhase2(supabase, candidateId, rawTranscript, message);
-    }
-
-    console.error("Unknown phase:", phase);
-    return NextResponse.json({ error: "Unknown phase" }, { status: 400 });
-  } catch (err) {
-    console.error("Candidate webhook error:", err);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    body = (await request.json()) as VapiEndOfCallReport;
+  } catch {
+    console.error("Candidate webhook: failed to parse JSON body");
+    return NextResponse.json({ received: true });
   }
+
+  if (body.message?.type !== "end-of-call-report") {
+    return NextResponse.json({ received: true });
+  }
+
+  const { message } = body;
+  const candidateId = message.call?.metadata?.candidateId;
+  const phase = message.call?.metadata?.phase;
+
+  if (!candidateId) {
+    console.error("Candidate webhook: no candidateId in call metadata");
+    return NextResponse.json({ received: true });
+  }
+
+  const rawTranscript = extractTranscript(message);
+  if (!rawTranscript) {
+    console.error("Candidate webhook: no transcript in end-of-call report for candidate", candidateId);
+    return NextResponse.json({ received: true });
+  }
+
+  const supabase = createAdminClient();
+
+  try {
+    if (phase === "1") {
+      await handlePhase1(supabase, candidateId, rawTranscript, message);
+    } else if (phase === "2") {
+      await handlePhase2(supabase, candidateId, rawTranscript, message);
+    } else {
+      console.error("Candidate webhook: unknown phase", phase, "for candidate", candidateId);
+    }
+  } catch (err) {
+    console.error("Candidate webhook: unhandled error for candidate", candidateId, err);
+  }
+
+  // Always 200 so Vapi doesn't retry
+  return NextResponse.json({ received: true });
 }
 
 async function handlePhase1(
@@ -88,10 +92,24 @@ async function handlePhase1(
   transcript: string,
   message: VapiEndOfCallReport["message"]
 ) {
-  const skills = await extractSkillsFromTranscript(transcript);
+  // Extract skills — fall back to empty array if Claude fails
+  let skills: string[] = [];
+  try {
+    skills = await extractSkillsFromTranscript(transcript);
+  } catch (err) {
+    console.error("Phase 1: skill extraction failed, using empty skills:", err);
+  }
 
-  const { question, matchedFounderProfileId } =
-    await generateSystemDesignQuestion(transcript, skills);
+  // Generate system design question — fall back to default if Claude fails
+  let question = FALLBACK_QUESTION;
+  let matchedFounderProfileId: string | null = null;
+  try {
+    const result = await generateSystemDesignQuestion(transcript, skills);
+    question = result.question;
+    matchedFounderProfileId = result.matchedFounderProfileId;
+  } catch (err) {
+    console.error("Phase 1: question generation failed, using fallback:", err);
+  }
 
   const { error } = await supabase.from("candidate_profiles").insert({
     candidate_id: candidateId,
@@ -104,23 +122,16 @@ async function handlePhase1(
   });
 
   if (error) {
-    console.error("Failed to save Phase 1 data:", error);
-    return NextResponse.json(
-      { error: "Database insert failed" },
-      { status: 500 }
-    );
+    // If a profile already exists (e.g., duplicate webhook), log and continue
+    console.error("Phase 1: DB insert failed for candidate", candidateId, error);
+    return;
   }
 
   console.log(
-    "Phase 1 complete for candidate",
-    candidateId,
-    "| Skills:",
-    skills,
-    "| Matched founder profile:",
-    matchedFounderProfileId
+    "Phase 1 complete | candidate:", candidateId,
+    "| skills:", skills,
+    "| matched founder profile:", matchedFounderProfileId
   );
-
-  return NextResponse.json({ success: true, phase: 1 });
 }
 
 async function handlePhase2(
@@ -138,11 +149,8 @@ async function handlePhase2(
     .single();
 
   if (fetchError || !existing) {
-    console.error("No Phase 1 profile found for candidate:", candidateId);
-    return NextResponse.json(
-      { error: "Phase 1 profile not found" },
-      { status: 400 }
-    );
+    console.error("Phase 2: no Phase 1 profile found for candidate:", candidateId, fetchError);
+    return;
   }
 
   const combinedTranscript = `${existing.raw_transcript}\n\n--- SYSTEM DESIGN PHASE ---\n\n${phase2Transcript}`;
@@ -161,18 +169,13 @@ async function handlePhase2(
     .eq("id", existing.id);
 
   if (updateError) {
-    console.error("Failed to update Phase 2 data:", updateError);
-    return NextResponse.json(
-      { error: "Database update failed" },
-      { status: 500 }
-    );
+    console.error("Phase 2: DB update failed for candidate", candidateId, updateError);
+    return;
   }
 
   // TODO: Run Claude evaluation to populate behavioral_score,
   // system_design_score, overall_score, behavioral_summary, etc.
   // TODO: Trigger matching engine
 
-  console.log("Phase 2 complete for candidate", candidateId);
-
-  return NextResponse.json({ success: true, phase: 2 });
+  console.log("Phase 2 complete | candidate:", candidateId, "| total duration:", totalDuration, "s");
 }
