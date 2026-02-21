@@ -42,12 +42,16 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Authenticated users don't need to see login/signup
+  // Authenticated users on login/signup → send to onboarding which
+  // will itself redirect to the right place if profile already exists
   if (user && isAuthRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/onboarding";
     return NextResponse.redirect(url);
   }
+
+  // Authenticated users hitting /onboarding who already have a profile
+  // are handled by the onboarding page's server component (no DB in middleware)
 
   return supabaseResponse;
 }

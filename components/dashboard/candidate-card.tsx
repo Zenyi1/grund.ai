@@ -7,10 +7,10 @@ import { cn } from "@/lib/utils";
 import type { RankedMatch, NormalizedWeights } from "@/app/founder/dashboard/types";
 
 function scoreColor(s: number) {
-  if (s >= 8) return { text: "text-emerald-700", bg: "bg-emerald-50", bar: "bg-emerald-500" };
-  if (s >= 6) return { text: "text-amber-700",   bg: "bg-amber-50",   bar: "bg-amber-500"   };
-  if (s >= 4) return { text: "text-orange-700",  bg: "bg-orange-50",  bar: "bg-orange-500"  };
-  return         { text: "text-red-700",    bg: "bg-red-50",    bar: "bg-red-500"    };
+  if (s >= 8) return { text: "text-emerald-600", bg: "bg-emerald-50", bar: "bg-emerald-500", ring: "ring-emerald-200" };
+  if (s >= 6) return { text: "text-amber-600", bg: "bg-amber-50", bar: "bg-amber-500", ring: "ring-amber-200" };
+  if (s >= 4) return { text: "text-orange-600", bg: "bg-orange-50", bar: "bg-orange-500", ring: "ring-orange-200" };
+  return { text: "text-red-600", bg: "bg-red-50", bar: "bg-red-500", ring: "ring-red-200" };
 }
 
 export default function CandidateCard({
@@ -37,14 +37,25 @@ export default function CandidateCard({
   const requiredLower = requiredSkills.map((s) => s.toLowerCase());
   const isRequired = (skill: string) => requiredLower.includes(skill.toLowerCase());
 
+  const matchedSkills = skills.filter((s) => isRequired(s));
+  const otherSkills = skills.filter((s) => !isRequired(s));
+  const displaySkills = [...matchedSkills, ...otherSkills].slice(0, 5);
+
   const colors = scoreColor(match.weightedScore);
 
   const dimensions = [
-    { label: "Skills",     score: match.skill_match_score,      weight: normalizedWeights.skills     },
-    { label: "Technical",  score: match.technical_score,         weight: normalizedWeights.technical  },
-    { label: "Experience", score: match.experience_match_score,  weight: normalizedWeights.experience },
-    { label: "Culture",    score: match.culture_match_score,     weight: normalizedWeights.culture    },
+    { label: "Skills", score: match.skill_match_score },
+    { label: "Technical", score: match.technical_score },
+    { label: "Experience", score: match.experience_match_score },
+    { label: "Culture", score: match.culture_match_score },
   ];
+
+  const bestDimension = dimensions.reduce((best, d) =>
+    (d.score ?? 0) > (best.score ?? 0) ? d : best
+  );
+  const worstDimension = dimensions.reduce((worst, d) =>
+    (d.score ?? 10) < (worst.score ?? 10) ? d : worst
+  );
 
   function handleConnect(e: React.MouseEvent) {
     e.stopPropagation();
@@ -62,122 +73,173 @@ export default function CandidateCard({
   return (
     <div
       className={cn(
-        "bg-white rounded-xl border border-gray-200 transition-shadow cursor-pointer",
-        expanded ? "shadow-md border-gray-300" : "hover:shadow-sm"
+        "bg-white rounded-xl border transition-all cursor-pointer",
+        expanded ? "shadow-md border-gray-300" : "border-gray-200 hover:shadow-sm hover:border-gray-300"
       )}
       onClick={() => setExpanded((v) => !v)}
     >
-      {/* ── Main row ─────────────────────────────────────────── */}
-      <div className="p-5 flex items-start gap-4">
-        {/* Rank badge */}
-        <div className="shrink-0 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center mt-0.5">
-          <span className="text-xs font-bold text-gray-500">#{rank}</span>
+      {/* ── Collapsed row ──────────────────────────────────── */}
+      <div className="px-5 py-4 flex items-center gap-4">
+        {/* Rank */}
+        <span className="shrink-0 text-sm font-bold text-gray-300 w-6 text-right">
+          {rank}
+        </span>
+
+        {/* Score circle */}
+        <div className={cn(
+          "shrink-0 w-12 h-12 rounded-full flex items-center justify-center ring-2",
+          colors.bg, colors.ring
+        )}>
+          <span className={cn("text-lg font-bold", colors.text)}>
+            {match.weightedScore.toFixed(1)}
+          </span>
         </div>
 
-        {/* Name + skills */}
+        {/* Main info */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-gray-900">{candidate.full_name}</span>
-            {profile.experience_level && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 capitalize">
-                {profile.experience_level}
-              </span>
-            )}
-            {profile.experience_years != null && (
-              <span className="text-xs text-gray-400">
-                {profile.experience_years}y exp
-              </span>
-            )}
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="font-semibold text-gray-900 text-[15px]">
+              {candidate.full_name}
+            </span>
+            <span className="text-xs text-gray-400">
+              {[
+                profile.experience_level,
+                profile.experience_years != null ? `${profile.experience_years}y` : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </span>
           </div>
 
-          {/* Skill tags */}
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {skills.slice(0, 7).map((skill) => (
+          {/* Skills inline */}
+          <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+            {displaySkills.map((skill) => (
               <span
                 key={skill}
                 className={cn(
-                  "text-xs px-2 py-0.5 rounded-full font-medium",
+                  "text-[11px] px-2 py-0.5 rounded-full font-medium",
                   isRequired(skill)
                     ? "bg-violet-100 text-violet-700"
-                    : "bg-gray-100 text-gray-600"
+                    : "bg-gray-100 text-gray-500"
                 )}
               >
                 {skill}
               </span>
             ))}
-            {skills.length > 7 && (
-              <span className="text-xs text-gray-400 self-center">
-                +{skills.length - 7} more
+            {skills.length > 5 && (
+              <span className="text-[11px] text-gray-300">
+                +{skills.length - 5}
               </span>
             )}
           </div>
 
-          {/* Match reasoning — visible when collapsed */}
-          {!expanded && match.match_reasoning && (
-            <p className="mt-2 text-xs text-gray-500 line-clamp-1">
+          {/* One-line reasoning — always visible */}
+          {match.match_reasoning && (
+            <p className="mt-1.5 text-xs text-gray-500 line-clamp-1 leading-relaxed">
               {match.match_reasoning}
             </p>
           )}
         </div>
 
-        {/* Score + connect + expand toggle */}
-        <div className="shrink-0 flex flex-col items-end gap-2.5">
-          {/* Weighted score */}
-          <div className={cn("rounded-lg px-3 py-1.5 text-center min-w-[56px]", colors.bg)}>
-            <span className={cn("text-2xl font-bold leading-none", colors.text)}>
-              {match.weightedScore.toFixed(1)}
-            </span>
-            <span className="text-xs text-gray-400 block">/10</span>
-          </div>
-
-          {/* Connect button */}
+        {/* Right side: connect + chevron */}
+        <div className="shrink-0 flex items-center gap-3">
           <button
             onClick={handleConnect}
             disabled={isPending || connected}
             className={cn(
-              "text-sm px-4 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap",
+              "text-xs px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap",
               connected
                 ? "bg-emerald-50 text-emerald-700 cursor-default"
                 : "bg-gray-900 text-white hover:bg-gray-700 disabled:opacity-60"
             )}
           >
-            {isPending ? "Sending…" : connected ? "Connected ✓" : "Connect"}
+            {isPending ? "Sending…" : connected ? "Connected" : "Connect"}
           </button>
 
           {connectError && (
-            <p className="text-xs text-red-500 text-right max-w-[120px]">{connectError}</p>
+            <p className="text-[10px] text-red-500 max-w-[100px]">{connectError}</p>
           )}
 
-          {/* Expand chevron */}
-          <span className="text-gray-400 mt-0.5">
-            {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          <span className="text-gray-300">
+            {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </span>
         </div>
       </div>
 
-      {/* ── Expanded detail ──────────────────────────────────── */}
+      {/* ── Expanded detail ────────────────────────────────── */}
       {expanded && (
         <div
-          className="border-t border-gray-100 px-5 py-5 space-y-5"
+          className="border-t border-gray-100 px-5 py-5"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Score breakdown */}
-          <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
-              Score breakdown
-            </p>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-              {dimensions.map(({ label, score, weight }) => {
+          <div className="flex gap-8">
+            {/* Left column — about the candidate */}
+            <div className="flex-1 min-w-0 space-y-4">
+              {/* Quick signal */}
+              <div className="flex items-center gap-4 text-xs">
+                <span className="flex items-center gap-1.5">
+                  <span className={cn("inline-block w-2 h-2 rounded-full", scoreColor(bestDimension.score ?? 0).bar)} />
+                  <span className="text-gray-500">Best:</span>
+                  <span className="font-medium text-gray-700">
+                    {bestDimension.label} ({(bestDimension.score ?? 0).toFixed(1)})
+                  </span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className={cn("inline-block w-2 h-2 rounded-full", scoreColor(worstDimension.score ?? 0).bar)} />
+                  <span className="text-gray-500">Weakest:</span>
+                  <span className="font-medium text-gray-700">
+                    {worstDimension.label} ({(worstDimension.score ?? 0).toFixed(1)})
+                  </span>
+                </span>
+              </div>
+
+              {/* Behavioral summary */}
+              {profile.behavioral_summary && (
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  {profile.behavioral_summary}
+                </p>
+              )}
+
+              {/* Strengths */}
+              {(profile.strengths ?? []).length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {profile.strengths!.map((s) => (
+                    <span
+                      key={s}
+                      className="text-xs px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 font-medium"
+                    >
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* LinkedIn */}
+              {candidate.linkedin_url && (
+                <a
+                  href={candidate.linkedin_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline font-medium"
+                >
+                  <ExternalLink size={12} />
+                  LinkedIn
+                </a>
+              )}
+            </div>
+
+            {/* Right column — score bars */}
+            <div className="shrink-0 w-48 space-y-3">
+              {dimensions.map(({ label, score }) => {
                 const s = score ?? 0;
                 const c = scoreColor(s);
                 return (
                   <div key={label}>
-                    <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="text-gray-600 font-medium">{label}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-gray-400">{Math.round(weight * 100)}% weight</span>
-                        <span className={cn("font-bold", c.text)}>{s.toFixed(1)}</span>
-                      </div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-gray-500">{label}</span>
+                      <span className={cn("text-xs font-bold tabular-nums", c.text)}>
+                        {s.toFixed(1)}
+                      </span>
                     </div>
                     <div className="w-full bg-gray-100 rounded-full h-1.5">
                       <div
@@ -190,85 +252,6 @@ export default function CandidateCard({
               })}
             </div>
           </div>
-
-          {/* Match reasoning */}
-          {match.match_reasoning && (
-            <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
-                Why this match
-              </p>
-              <p className="text-sm text-gray-700 leading-relaxed">{match.match_reasoning}</p>
-            </div>
-          )}
-
-          {/* Behavioral summary */}
-          {profile.behavioral_summary && (
-            <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
-                Candidate summary
-              </p>
-              <p className="text-sm text-gray-700 leading-relaxed">{profile.behavioral_summary}</p>
-            </div>
-          )}
-
-          {/* Strengths */}
-          {(profile.strengths ?? []).length > 0 && (
-            <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">
-                Strengths
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {profile.strengths!.map((s) => (
-                  <span
-                    key={s}
-                    className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium"
-                  >
-                    {s}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* All skills (if more than 7) */}
-          {skills.length > 7 && (
-            <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">
-                All skills{" "}
-                <span className="normal-case text-gray-300 font-normal">
-                  (violet = required match)
-                </span>
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {skills.map((skill) => (
-                  <span
-                    key={skill}
-                    className={cn(
-                      "text-xs px-2 py-0.5 rounded-full font-medium",
-                      isRequired(skill)
-                        ? "bg-violet-100 text-violet-700"
-                        : "bg-gray-100 text-gray-600"
-                    )}
-                  >
-                    {skill}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* LinkedIn */}
-          {candidate.linkedin_url && (
-            <a
-              href={candidate.linkedin_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline"
-            >
-              <ExternalLink size={13} />
-              View LinkedIn profile
-            </a>
-          )}
         </div>
       )}
     </div>

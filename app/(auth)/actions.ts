@@ -27,7 +27,15 @@ export async function login(_: unknown, formData: FormData) {
     if (founderError && founderError.code !== "PGRST116") {
       console.error("Login: founder check failed:", founderError);
     }
-    if (founder) redirect("/founder/dashboard");
+    if (founder) {
+      const { data: founderProfile } = await supabase
+        .from("founder_profiles")
+        .select("id")
+        .eq("founder_id", user.id)
+        .limit(1)
+        .single();
+      redirect(founderProfile ? "/founder/dashboard" : "/founder/interview");
+    }
 
     const { data: candidate, error: candidateError } = await supabase
       .from("candidates")
@@ -83,7 +91,16 @@ export async function completeOnboarding(_: unknown, formData: FormData) {
       .select("id")
       .eq("id", user.id)
       .single();
-    if (existing) redirect("/founder/dashboard");
+
+    if (existing) {
+      const { data: founderProfile } = await supabase
+        .from("founder_profiles")
+        .select("id")
+        .eq("founder_id", user.id)
+        .limit(1)
+        .single();
+      redirect(founderProfile ? "/founder/dashboard" : "/founder/interview");
+    }
 
     const { error } = await supabase.from("founders").insert({
       id: user.id,
@@ -93,7 +110,7 @@ export async function completeOnboarding(_: unknown, formData: FormData) {
       website: (formData.get("website") as string) || null,
     });
     if (error) return { error: error.message };
-    redirect("/founder/dashboard");
+    redirect("/founder/interview");
   }
 
   if (role === "candidate") {
