@@ -1,7 +1,12 @@
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM = process.env.RESEND_FROM_EMAIL ?? "hello@foundermatch.com";
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_APP_PASSWORD,
+  },
+});
 
 interface IntroParams {
   founderName: string;
@@ -45,7 +50,9 @@ export async function sendIntroEmails(params: IntroParams) {
     ? `${candidateExperienceYears} year${candidateExperienceYears !== 1 ? "s" : ""} of experience`
     : null;
 
-  // ── Email to founder ─────────────────────────────────────────────────────
+  const FROM = `FounderMatch <${process.env.GMAIL_USER}>`;
+
+  // ── Email to founder ──────────────────────────────────────────────────────
   const founderHtml = `
 <p>Hi ${founderName},</p>
 
@@ -64,7 +71,7 @@ export async function sendIntroEmails(params: IntroParams) {
 <p style="color:#888;font-size:12px;">— The FounderMatch team</p>
   `.trim();
 
-  // ── Email to candidate ───────────────────────────────────────────────────
+  // ── Email to candidate ────────────────────────────────────────────────────
   const candidateHtml = `
 <p>Hi ${candidateName},</p>
 
@@ -83,21 +90,18 @@ ${roleDescription ? `<p><strong>What they're building and who they need:</strong
 <p style="color:#888;font-size:12px;">— The FounderMatch team</p>
   `.trim();
 
-  const [r1, r2] = await Promise.all([
-    resend.emails.send({
+  await Promise.all([
+    transporter.sendMail({
       from: FROM,
       to: founderEmail,
       subject: `You connected with ${candidateName}!`,
       html: founderHtml,
     }),
-    resend.emails.send({
+    transporter.sendMail({
       from: FROM,
       to: candidateEmail,
       subject: `A startup wants to meet you — ${companyName}`,
       html: candidateHtml,
     }),
-  ]);
-
-  if (r1.error) console.error("Intro email to founder failed:", r1.error);
-  if (r2.error) console.error("Intro email to candidate failed:", r2.error);
+  ]).catch((err) => console.error("sendIntroEmails failed:", err));
 }
