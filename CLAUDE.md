@@ -530,11 +530,11 @@ RESEND_FROM_EMAIL=hello@foundermatch.com
 
 ## Build Order (Recommended)
 
-### Phase 1 — Foundation
-1. [ ] Init Next.js + Tailwind + shadcn
-2. [ ] Supabase project setup + run migrations
-3. [ ] Auth flow (signup/login/onboarding with role selection)
-4. [ ] Basic layout and navigation
+### Phase 1 — Foundation ✅
+1. [x] Init Next.js + Tailwind + shadcn
+2. [x] Supabase project setup + run migrations
+3. [x] Auth flow (signup/login/onboarding with role selection)
+4. [x] Basic layout and navigation
 
 ### Phase 2 — Founder Flow
 5. [ ] Deepgram STT/TTS integration (standalone test page)

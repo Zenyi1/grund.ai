@@ -9,7 +9,10 @@
       "mcp__supabase__get_publishable_keys",
       "mcp__supabase__apply_migration",
       "mcp__supabase__list_tables",
-      "mcp__supabase__get_advisors"
+      "mcp__supabase__get_advisors",
+      "Bash(cd /c/Users/zenyi/OneDrive/Desktop/grund.ai && CI=true npx create-next-app@latest . --typescript --tailwind --eslint --app --no-src-dir --import-alias \"@/*\" --yes 2>&1)",
+      "Bash(cd /c/Users/zenyi/OneDrive/Desktop/grund.ai && npm install 2>&1)",
+      "Bash(cd /c/Users/zenyi/OneDrive/Desktop/grund.ai && npx tsc --noEmit 2>&1)"
     ]
   },
   "enableAllProjectMcpServers": true,
