@@ -540,7 +540,7 @@ RESEND_FROM_EMAIL=hello@foundermatch.com
 5. [ ] Deepgram STT/TTS integration (standalone test page)
 6. [ ] Founder interview page (voice UI + Claude orchestration)
 7. [ ] Founder profile extraction and DB storage
-8. [ ] Founder dashboard (static/mock data first)
+8. [x] Founder dashboard (weighted match ranking, top 5, connect flow)
 
 ### Phase 3 — Candidate Flow
 9. [ ] Candidate interview Phase 1 (behavioral)
