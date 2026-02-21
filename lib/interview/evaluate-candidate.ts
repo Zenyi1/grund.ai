@@ -14,7 +14,7 @@ export interface CandidateEvaluation {
 
 function getGemini() {
   return new GoogleGenerativeAI(process.env.GEMINI_API_KEY!).getGenerativeModel({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
   });
 }
 
@@ -46,7 +46,6 @@ export async function evaluateCandidate(
 Important: The Phase 2 challenge may be a system design question, a GTM case study, a product case study, a marketing challenge, or another domain-specific scenario depending on the candidate's background. Evaluate it in the context of their field — do not apply engineering standards to a sales or marketing candidate.
 
 Scoring guide: 8-10 = exceptional, 6-7 = solid, 4-5 = average, below 4 = weak.
-Be strict — most candidates score 5-7.
 
 Transcript:
 ${combinedTranscript}`

@@ -19,7 +19,7 @@ const FALLBACK_QUESTION =
 
 function getGemini() {
   return new GoogleGenerativeAI(process.env.GEMINI_API_KEY!).getGenerativeModel({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
   });
 }
 
