@@ -46,6 +46,11 @@ create table public.founder_profiles (
   work_style text,                            -- 'remote' | 'hybrid' | 'onsite'
   culture_values text[],                      -- extracted soft requirements
   deal_breakers text[],                       -- hard nos
+  -- Founder-defined matching weights (must sum to 100)
+  weight_skills int default 35,              -- importance of skill match
+  weight_experience int default 20,          -- importance of experience fit
+  weight_culture int default 15,             -- importance of culture/soft factors
+  weight_technical int default 30,           -- importance of interview performance
   interview_duration_sec int,
   created_at timestamptz default now()
 );
@@ -91,8 +96,7 @@ create table public.match_scores (
   experience_match_score numeric(3,1),        -- 0-10 seniority fit
   culture_match_score numeric(3,1),           -- 0-10 soft factors
   technical_score numeric(3,1),               -- from candidate interview
-  overall_match_score numeric(3,1),           -- weighted composite
-  match_reasoning text,                       -- Claude-generated explanation
+  overall_match_score numeric(3,1),           -- weighted composite using founder's weights
   created_at timestamptz default now(),
   unique (founder_profile_id, candidate_profile_id)
 );
@@ -290,7 +294,6 @@ lib/interview/evaluate-candidate.ts     -- Claude scoring
   - Candidate name, experience level
   - Skill overlap (visual: matched skills highlighted)
   - Behavioral score, system design score, overall score
-  - Claude-generated match reasoning (1-2 sentences)
   - "Connect" button
 - Filter/sort by: score, skills, experience level
 - Clicking a card expands to full profile view
@@ -311,46 +314,58 @@ lib/email/templates/intro-email.tsx          -- React Email template
 
 ---
 
-### Module 5: Matching Engine
+### Module 5: Matching Engine (Deterministic, No AI)
 
-**Triggered:** After each candidate interview completes.
+**Triggered:** After each candidate interview completes, and when a founder updates their weights.
+
+**Approach:** The AI's job ends at the interview. It scores each candidate during the interview (behavioral_score, system_design_score). Matching is pure math — no AI in the loop. Founders control the weight of each scoring dimension.
 
 **Steps:**
-1. Load all `founder_profiles`
-2. For each founder profile, compute match score against new candidate
-3. Use Claude for nuanced matching (not just keyword overlap)
+1. Load all `founder_profiles` (including their custom weights)
+2. For each founder profile, compute sub-scores against the new candidate:
 
-**Claude Matching Prompt:**
+**Sub-score calculations:**
+
+- **skill_match_score (0-10):** Deterministic set comparison between candidate `skills[]` and founder `required_skills[]` / `preferred_skills[]`.
+  - All required + some preferred = 10
+  - All required = 7
+  - Some required = proportional (e.g. 3 of 5 required = 4.2)
+  - None = 0
+  - Bonus +1 for each preferred skill matched (capped at 10)
+
+- **experience_match_score (0-10):** Compare candidate `experience_level` to founder `experience_level`.
+  - Exact match = 10
+  - One level above = 8 (overqualified but fine)
+  - One level below = 5 (stretch)
+  - Two+ levels off = 2
+
+- **culture_match_score (0-10):** Compare candidate `work_style_preference` to founder `work_style`, and candidate `strengths[]` overlap with founder `culture_values[]`.
+  - Work style match = 5 points
+  - Each culture value overlap = proportional share of remaining 5 points
+
+- **technical_score (0-10):** Directly from the candidate's interview scores.
+  - `(behavioral_score + system_design_score) / 2`
+
+3. **Deal-breaker check:** If any candidate attribute matches a founder's `deal_breakers[]`, cap `overall_match_score` at 3 regardless of weights.
+
+4. **Compute overall_match_score** using the founder's custom weights:
 ```
-Given a founder's requirements and a candidate's profile, score the match.
-
-Founder wants: { ...founder_profile }
-Candidate has: { ...candidate_profile }
-
-Return JSON:
-{
-  "skill_match_score": 0-10,       // how well hard skills align
-  "experience_match_score": 0-10,  // seniority fit
-  "culture_match_score": 0-10,     // soft factors alignment
-  "technical_score": 0-10,         // from interview performance
-  "overall_match_score": 0-10,     // weighted composite
-  "match_reasoning": "..."         // 1-2 sentence explanation
-}
-
-Scoring guide:
-- Skill match: 10 = all required + preferred, 7 = all required, 4 = some required, 0 = none
-- Check for deal-breakers — if any hit, cap overall at 3
-- Weight: skills 35%, experience 20%, culture 15%, technical 30%
+overall = (skill_match_score × weight_skills
+         + experience_match_score × weight_experience
+         + culture_match_score × weight_culture
+         + technical_score × weight_technical) / 100
 ```
+Weights are stored on `founder_profiles` and must sum to 100. Founders can adjust them from their dashboard (defaults: skills 35, experience 20, culture 15, technical 30).
 
-4. Upsert into `match_scores`
-5. Notify founder dashboard via Supabase Realtime
+5. Upsert into `match_scores`
+6. Notify founder dashboard via Supabase Realtime
 
 **Key files:**
 ```
-lib/matching/engine.ts                -- orchestrates matching
-lib/matching/prompts.ts               -- Claude matching prompts
-app/api/matching/run/route.ts         -- API trigger (also callable from edge function)
+lib/matching/engine.ts                -- deterministic scoring logic
+lib/matching/score-helpers.ts         -- sub-score calculation functions
+app/api/matching/run/route.ts         -- API trigger
+app/api/matching/weights/route.ts     -- founder weight update endpoint
 supabase/functions/match-on-interview -- edge function triggered after candidate interview
 ```
 
@@ -479,7 +494,7 @@ Browser Mic → Deepgram STT (WebSocket) → text
 │   │   └── evaluate-candidate.ts
 │   ├── matching/
 │   │   ├── engine.ts
-│   │   └── prompts.ts
+│   │   └── score-helpers.ts
 │   └── email/
 │       ├── send-intro.ts
 │       └── templates/
@@ -549,7 +564,7 @@ RESEND_FROM_EMAIL=hello@foundermatch.com
 12. [ ] Candidate evaluation and scoring
 
 ### Phase 4 — Matching & Connection
-13. [ ] Matching engine (Claude-powered scoring)
+13. [ ] Matching engine (deterministic weighted scoring + founder weight controls)
 14. [ ] Dashboard with real match data + Supabase Realtime
 15. [ ] Connect flow + intro emails via Resend
 
@@ -567,8 +582,8 @@ RESEND_FROM_EMAIL=hello@foundermatch.com
 **Why Supabase?**
 Auth + Postgres + RLS + Realtime + Edge Functions in one. Fast to set up, generous free tier, great DX with Next.js.
 
-**Why Claude for matching (not vector similarity)?**
-Matching founders and candidates requires nuanced reasoning — understanding that "React Native" partially matches "React", that a founder who values "move fast" might clash with someone who "likes thorough planning", and that deal-breakers are absolute. Claude handles this better than cosine similarity on embeddings.
+**Why deterministic matching (not AI)?**
+AI is used where it adds value: conducting interviews and scoring candidates. For matching, simple weighted math is more transparent, faster, and gives founders direct control. Founders set how much they care about skills vs. experience vs. culture vs. technical ability, and the scores from the AI interview feed directly into a formula. No LLM latency or cost per match, and founders can tweak weights and instantly see rankings update.
 
 **Why no candidate-facing results?**
 Prevents gaming the system. Candidates can't optimize for scores they can't see. Founders get unbiased signal.

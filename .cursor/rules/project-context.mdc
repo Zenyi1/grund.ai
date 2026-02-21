@@ -1,3 +1,8 @@
+---
+description: FounderMatch platform spec — tech stack, schema, modules, prompts, build order
+alwaysApply: true
+---
+
 # FounderMatch — Platform Specification
 
 ## Overview
@@ -94,7 +99,7 @@ create table public.match_scores (
   candidate_profile_id uuid references public.candidate_profiles(id) on delete cascade,
   skill_match_score numeric(3,1),             -- 0-10 how well skills align
   experience_match_score numeric(3,1),        -- 0-10 seniority fit
-  culture_match_score numeric(3,1),           -- 0-10 soft factors
+  culture_match_score numeric(3,1),          -- 0-10 soft factors
   technical_score numeric(3,1),               -- from candidate interview
   overall_match_score numeric(3,1),           -- weighted composite using founder's weights
   created_at timestamptz default now(),
@@ -516,7 +521,7 @@ Browser Mic → Deepgram STT (WebSocket) → text
 │       └── skill-tags.tsx
 ├── .env.local.example
 ├── package.json
-├── claude.md                           -- this file
+├── context.md
 └── README.md
 ```
 
