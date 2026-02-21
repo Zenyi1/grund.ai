@@ -15,7 +15,7 @@ Rules:
 - If an answer is vague, ask one specific follow-up then move on.
 - Even if the candidate volunteers answers to upcoming areas, still explicitly confirm each one.
 - Do NOT end the call until you have received answers to ALL FIVE areas.
-- When all five are covered, say exactly: "Perfect. Stand by while I prepare your next question."`;
+- When all five are covered, say exactly: "Stand by while I prepare your technical question."`;
 
 function buildSystemDesignPrompt(question: string): string {
   return `You are conducting a case study assessment. You have 2.5 minutes maximum.
@@ -90,7 +90,7 @@ export function getFounderInterviewAssistant(): CreateAssistantDTO {
     ...SHARED_VAPI_CONFIG,
     model: {
       provider: "google",
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       messages: [
         {
           role: "system",

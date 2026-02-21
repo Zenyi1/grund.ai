@@ -70,6 +70,7 @@ export default async function FounderDashboardPage() {
     `
     )
     .eq("founder_profile_id", activeProfile.id)
+    .gte("overall_match_score", 4.0)
     .order("overall_match_score", { ascending: false });
 
   // Which candidates this founder already connected with

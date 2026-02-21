@@ -34,6 +34,12 @@ export function VapiCall({ assistantConfig, onCallEnd, autoStart = false }: Vapi
     onCallEndRef.current = onCallEnd;
   }, [onCallEnd]);
 
+  // Keep assistantConfig in a ref so the message handler can read endCallPhrases
+  const assistantConfigRef = useRef(assistantConfig);
+  useEffect(() => {
+    assistantConfigRef.current = assistantConfig;
+  }, [assistantConfig]);
+
   // Track whether this component instance actually started a call.
   // Prevents leftover "call-end" from a previous phase firing onCallEnd.
   const callStartedRef = useRef(false);
@@ -61,7 +67,7 @@ export function VapiCall({ assistantConfig, onCallEnd, autoStart = false }: Vapi
     };
 
     const handleCallEnd = () => {
-      if (!callStartedRef.current) return;
+      if (!callStartedRef.current || callEndedRef.current) return;
       callEndedRef.current = true;
       setStatus("ended");
       // Build plain-text transcript and pass it to the callback
@@ -90,6 +96,20 @@ export function VapiCall({ assistantConfig, onCallEnd, autoStart = false }: Vapi
           transcriptRef.current = next; // keep ref in sync for the call-end handler
           return next;
         });
+
+        // Client-side safety net: if Vapi cloud misses the endCallPhrase, we end the
+        // call ourselves the moment we see it in the assistant's transcript.
+        if (role === "assistant" && !callEndedRef.current) {
+          const phrases = (assistantConfigRef.current.endCallPhrases as string[] | undefined) ?? [];
+          const lower = text.toLowerCase();
+          if (phrases.some((p) => lower.includes(p.toLowerCase()))) {
+            try {
+              vapi.stop();
+            } catch {
+              // Already stopped — ignore
+            }
+          }
+        }
       }
     };
 

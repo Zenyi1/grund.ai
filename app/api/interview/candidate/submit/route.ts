@@ -5,6 +5,7 @@ import {
   generateSystemDesignQuestion,
 } from "@/lib/interview/question-generator";
 import { evaluateCandidate } from "@/lib/interview/evaluate-candidate";
+import { runMatchingForCandidate } from "@/lib/matching/engine";
 
 /**
  * Direct client-to-server submission route.
@@ -131,7 +132,10 @@ export async function POST(request: NextRequest) {
       "| overall score:", evaluation?.overall_score ?? "not evaluated"
     );
 
-    // TODO: trigger matching engine
+    // Run matching engine async — don't block the response
+    runMatchingForCandidate(existing.id).catch((err) =>
+      console.error("Matching engine error:", err)
+    );
 
     return NextResponse.json({ success: true });
   }
