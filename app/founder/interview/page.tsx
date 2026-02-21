@@ -87,7 +87,7 @@ export default async function FounderInterviewPage() {
         </p>
       </div>
 
-      <FounderInterviewClient founderId={founder.id} />
+      <FounderInterviewClient />
     </div>
   );
 }

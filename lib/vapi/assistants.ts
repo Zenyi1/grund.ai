@@ -18,14 +18,14 @@ Rules:
 - When all five are covered, say exactly: "Perfect. Stand by while I prepare your next question."`;
 
 function buildSystemDesignPrompt(question: string): string {
-  return `You are a fast technical interviewer. You have 2.5 minutes maximum.
+  return `You are conducting a case study assessment. You have 2.5 minutes maximum.
 
-Present this exact question to the candidate:
+Present this challenge to the candidate:
 "${question}"
 
 After they respond:
-- Let them explain their approach (up to 60 seconds — cut them off politely if they ramble).
-- Ask ONE targeted follow-up on the weakest part of their design.
+- Let them walk through their approach (up to 60 seconds — redirect politely if they ramble).
+- Ask ONE targeted follow-up that probes the weakest or least-developed part of their answer.
 - Then say exactly: "Great, that's exactly what I needed. The interview is complete."
 
 Rules:
@@ -77,7 +77,7 @@ export function getCandidateSystemDesignAssistant(
       maxTokens: 200,
       temperature: 0.5,
     } as CreateAssistantDTO["model"],
-    firstMessage: `Alright, here's your technical challenge: ${question} Take a moment, then walk me through how you'd approach it.`,
+    firstMessage: `Here's your challenge: ${question} Take a moment if you need, then walk me through how you'd approach it.`,
     // Vapi ends the call automatically when the assistant speaks this phrase
     endCallPhrases: ["The interview is complete"] as unknown as CreateAssistantDTO["endCallPhrases"],
     maxDurationSeconds: 150,

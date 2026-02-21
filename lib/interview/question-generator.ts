@@ -15,7 +15,7 @@ interface GeneratedQuestion {
 }
 
 const FALLBACK_QUESTION =
-  "Design a URL shortener service like bit.ly. Walk me through your architecture, how you'd handle high traffic, and how you'd store and look up the mappings efficiently.";
+  "Walk me through a significant challenge you faced in your work and how you solved it. Focus on your decision-making process and the trade-offs you considered.";
 
 function getGemini() {
   return new GoogleGenerativeAI(process.env.GEMINI_API_KEY!).getGenerativeModel({
@@ -34,7 +34,7 @@ export async function extractSkillsFromTranscript(
   try {
     const model = getGemini();
     const result = await model.generateContent(
-      `Extract the technical skills mentioned or clearly implied in this interview transcript. Return ONLY a JSON array of lowercase skill strings. No explanation.\n\nTranscript:\n${transcript}`
+      `Extract the professional skills, tools, domains, and areas of expertise mentioned or clearly implied in this interview transcript. Include both technical skills (languages, frameworks) and non-technical ones (go-to-market, demand generation, product strategy, financial modeling, etc.). Return ONLY a JSON array of lowercase skill strings. No explanation.\n\nTranscript:\n${transcript}`
     );
     const text = result.response.text();
     const match = text.match(/\[[\s\S]*\]/);
@@ -104,7 +104,7 @@ export async function generateSystemDesignQuestion(
     const top = matchingProfiles[0];
     matchedProfileId = top.id;
     founderContext = `
-The candidate may be a good fit for: ${top.role_title || "Software Engineer"}.
+A matching role has been identified: ${top.role_title || "open role"}.
 Role description: ${top.role_description || "N/A"}
 Required skills: ${top.required_skills?.join(", ") || "N/A"}
 Preferred skills: ${top.preferred_skills?.join(", ") || "N/A"}`;
@@ -113,19 +113,32 @@ Preferred skills: ${top.preferred_skills?.join(", ") || "N/A"}`;
   try {
     const model = getGemini();
     const result = await model.generateContent(
-      `Generate a system design interview question based on:
+      `You are preparing a candidate assessment challenge. Based on the candidate's background, generate a challenge appropriate for their professional function.
 
-Candidate skills: ${candidateSkills.join(", ") || "general software engineering"}
+Candidate skills and expertise: ${candidateSkills.join(", ") || "not specified"}
 ${founderContext}
 
-The question should:
-1. Use technologies the candidate claims to know
-2. ${matchedProfileId ? "Be relevant to what the matching company is building" : "Test general architectural thinking"}
-3. Test architectural thinking, not trivia
-4. Be discussable in ~2.5 minutes
-5. Have natural follow-up probes
+Phase 1 interview transcript (for context on their role and background):
+${transcript.slice(0, 2000)}
 
-Return ONLY the question text. No preamble, no explanation. 1-2 sentences max.`
+Step 1 — Identify the candidate's primary function from their background and target role:
+- Software / Engineering → system design (architecture, scalability, trade-offs)
+- Product Management → product case study (prioritization, roadmap decisions, metrics)
+- Sales / GTM / Business Development → go-to-market scenario (launch strategy, pipeline, customer acquisition)
+- Marketing / Growth → marketing challenge (campaign strategy, channel mix, growth levers)
+- Design / UX → design challenge (user problem framing, design decisions, trade-offs)
+- Data / Analytics → data case study (analysis approach, metric design, insight extraction)
+- Operations / Finance → operational problem (process design, efficiency, trade-offs)
+- Other → a scenario directly relevant to their stated field and experience level
+
+Step 2 — Generate the challenge:
+- Make it directly relevant to their background and target role
+- ${matchedProfileId ? "Where possible, tie it to the matching role context above" : "Base it purely on their stated background"}
+- It should test real judgment and decision-making, not trivia or memorization
+- It must be discussable in ~2.5 minutes with natural follow-up probes
+- Match the difficulty to their stated experience level
+
+Return ONLY the challenge text. 2-4 sentences max. No preamble, no category label, no explanation.`
     );
 
     const question = result.response.text().trim();

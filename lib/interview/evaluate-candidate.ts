@@ -32,16 +32,18 @@ export async function evaluateCandidate(
       `Evaluate this two-phase interview transcript and return ONLY a JSON object with these exact fields:
 
 {
-  "behavioral_summary": "1-2 sentence summary of background and communication quality",
+  "behavioral_summary": "1-2 sentence summary of the candidate's background, communication quality, and overall impression from Phase 1",
   "behavioral_score": <number 0-10>,
-  "system_design_summary": "1-2 sentence evaluation of technical depth and reasoning",
+  "system_design_summary": "1-2 sentence evaluation of the candidate's case study response in Phase 2 — assess their judgment, structure, and depth appropriate to their field (engineering, GTM, product, marketing, etc.)",
   "system_design_score": <number 0-10>,
-  "overall_score": <number 0-10, weighted: behavioral 30% + system_design 70%>,
+  "overall_score": <number 0-10, weighted: behavioral 30% + case study 70%>,
   "experience_years": <number or null if unclear>,
   "experience_level": "junior" | "mid" | "senior" | "lead",
   "strengths": ["up to 3 short strengths"],
   "work_style_preference": "remote" | "hybrid" | "onsite" | null
 }
+
+Important: The Phase 2 challenge may be a system design question, a GTM case study, a product case study, a marketing challenge, or another domain-specific scenario depending on the candidate's background. Evaluate it in the context of their field — do not apply engineering standards to a sales or marketing candidate.
 
 Scoring guide: 8-10 = exceptional, 6-7 = solid, 4-5 = average, below 4 = weak.
 Be strict — most candidates score 5-7.

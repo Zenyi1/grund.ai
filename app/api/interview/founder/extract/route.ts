@@ -39,7 +39,7 @@ export async function POST(req: Request) {
       durationSec ?? 0
     );
 
-    return Response.json({ profileId: saved.id, extraction });
+    return Response.json({ profileId: saved?.id ?? null, extraction });
   } catch (err) {
     console.error("Extraction/save error:", err);
     const message = err instanceof Error ? err.message : "Unknown error";

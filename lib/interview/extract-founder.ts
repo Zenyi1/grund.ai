@@ -1,5 +1,4 @@
-import { generateText } from "ai";
-import { google } from "@ai-sdk/google";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { FOUNDER_EXTRACTION_SYSTEM_PROMPT } from "./founder-prompts";
 import { createAdminClient } from "@/lib/supabase/server";
 
@@ -22,12 +21,17 @@ export interface FounderProfileExtraction {
 export async function extractFounderProfile(
   transcript: string
 ): Promise<FounderProfileExtraction> {
-  const { text } = await generateText({
-    model: google("gemini-2.0-flash"),
-    system: FOUNDER_EXTRACTION_SYSTEM_PROMPT,
-    prompt: `Here is the interview transcript:\n\n${transcript}`,
-    temperature: 0,
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.0-flash",
+    systemInstruction: FOUNDER_EXTRACTION_SYSTEM_PROMPT,
+    generationConfig: { temperature: 0 },
   });
+
+  const result = await model.generateContent(
+    `Here is the interview transcript:\n\n${transcript}`
+  );
+  const text = result.response.text();
 
   const cleaned = text.replace(/```json\n?|\n?```/g, "").trim();
   const parsed: FounderProfileExtraction = JSON.parse(cleaned);
