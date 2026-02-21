@@ -4,6 +4,7 @@ import {
   extractSkillsFromTranscript,
   generateSystemDesignQuestion,
 } from "@/lib/interview/question-generator";
+import { evaluateCandidate } from "@/lib/interview/evaluate-candidate";
 
 interface VapiEndOfCallReport {
   message: {
@@ -160,12 +161,29 @@ async function handlePhase2(
     : 0;
   const totalDuration = (existing.interview_duration_sec || 0) + phase2Duration;
 
+  // Run Claude evaluation on the full transcript
+  const evaluation = await evaluateCandidate(combinedTranscript);
+
+  const updatePayload: Record<string, unknown> = {
+    raw_transcript: combinedTranscript,
+    interview_duration_sec: totalDuration,
+  };
+
+  if (evaluation) {
+    updatePayload.behavioral_summary = evaluation.behavioral_summary;
+    updatePayload.behavioral_score = evaluation.behavioral_score;
+    updatePayload.system_design_summary = evaluation.system_design_summary;
+    updatePayload.system_design_score = evaluation.system_design_score;
+    updatePayload.overall_score = evaluation.overall_score;
+    updatePayload.experience_years = evaluation.experience_years;
+    updatePayload.experience_level = evaluation.experience_level;
+    updatePayload.strengths = evaluation.strengths;
+    updatePayload.work_style_preference = evaluation.work_style_preference;
+  }
+
   const { error: updateError } = await supabase
     .from("candidate_profiles")
-    .update({
-      raw_transcript: combinedTranscript,
-      interview_duration_sec: totalDuration,
-    })
+    .update(updatePayload)
     .eq("id", existing.id);
 
   if (updateError) {
@@ -173,9 +191,11 @@ async function handlePhase2(
     return;
   }
 
-  // TODO: Run Claude evaluation to populate behavioral_score,
-  // system_design_score, overall_score, behavioral_summary, etc.
-  // TODO: Trigger matching engine
+  // TODO: Trigger matching engine against all founder profiles
 
-  console.log("Phase 2 complete | candidate:", candidateId, "| total duration:", totalDuration, "s");
+  console.log(
+    "Phase 2 complete | candidate:", candidateId,
+    "| total duration:", totalDuration, "s",
+    "| overall score:", evaluation?.overall_score ?? "not evaluated"
+  );
 }

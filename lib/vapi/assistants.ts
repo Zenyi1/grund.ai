@@ -1,18 +1,21 @@
 import type { CreateAssistantDTO } from "@vapi-ai/web/dist/api";
 
-const BEHAVIORAL_PROMPT = `You are a fast technical screener. You have 2.5 minutes maximum.
+const BEHAVIORAL_PROMPT = `You are a career screener. Collect the information below as efficiently as possible. No small talk, no pleasantries.
 
-Cover these three things in order, one question at a time:
-1. Main tech stack and years of experience — get specifics (languages, frameworks, tools).
-2. A recent project they built — what it does, what their role was.
-3. Work preference — remote, hybrid, or onsite.
+Cover these five areas in order, one at a time:
+1. Target role and background — what kind of role are they looking for and what do they do?
+2. Main skills or areas of expertise — get specifics (tools, languages, domains, methods — whatever fits their field).
+3. Experience — total years and how they'd describe their level (early-career, mid-level, senior, or lead).
+4. A recent achievement — a project or result they're proud of and what their specific role was.
+5. Work preference — remote, hybrid, or onsite?
 
 Rules:
-- One question at a time. Don't combine them.
+- One question at a time. Wait for each answer before continuing.
+- No compliments, no filler phrases.
 - If an answer is vague, ask one specific follow-up then move on.
-- Keep it moving — redirect after 30 seconds per topic.
-- No small talk, no filler.
-- When you've covered all three, say exactly: "Perfect. I'm generating your technical challenge now — hang tight."`;
+- Even if the candidate volunteers answers to upcoming areas, still explicitly confirm each one.
+- Do NOT end the call until you have received answers to ALL FIVE areas.
+- When all five are covered, say exactly: "Perfect. Stand by while I prepare your next question."`;
 
 function buildSystemDesignPrompt(question: string): string {
   return `You are a fast technical interviewer. You have 2.5 minutes maximum.
@@ -23,7 +26,7 @@ Present this exact question to the candidate:
 After they respond:
 - Let them explain their approach (up to 60 seconds — cut them off politely if they ramble).
 - Ask ONE targeted follow-up on the weakest part of their design.
-- Then say: "Great, that's exactly what I needed. The interview is complete."
+- Then say exactly: "Great, that's exactly what I needed. The interview is complete."
 
 Rules:
 - Only one follow-up question total.
@@ -46,14 +49,16 @@ export function getCandidateBehavioralAssistant(): CreateAssistantDTO {
   return {
     ...SHARED_VAPI_CONFIG,
     model: {
-      provider: "anthropic",
-      model: "claude-sonnet-4-20250514",
+      provider: "google",
+      model: "gemini-2.0-flash",
       messages: [{ role: "system", content: BEHAVIORAL_PROMPT }],
-      maxTokens: 150,
+      maxTokens: 200,
       temperature: 0.5,
-    },
+    } as CreateAssistantDTO["model"],
     firstMessage:
-      "Hey, let's keep this quick. What's your main technical stack and how many years have you been working with it?",
+      "What type of role are you looking for, and what's your background?",
+    // Vapi ends the call automatically when the assistant speaks this phrase
+    endCallPhrases: ["Stand by while I prepare your technical question"] as unknown as CreateAssistantDTO["endCallPhrases"],
     maxDurationSeconds: 150,
   };
 }
@@ -64,15 +69,17 @@ export function getCandidateSystemDesignAssistant(
   return {
     ...SHARED_VAPI_CONFIG,
     model: {
-      provider: "anthropic",
-      model: "claude-sonnet-4-20250514",
+      provider: "google",
+      model: "gemini-2.0-flash",
       messages: [
         { role: "system", content: buildSystemDesignPrompt(question) },
       ],
       maxTokens: 200,
       temperature: 0.5,
-    },
+    } as CreateAssistantDTO["model"],
     firstMessage: `Alright, here's your technical challenge: ${question} Take a moment, then walk me through how you'd approach it.`,
+    // Vapi ends the call automatically when the assistant speaks this phrase
+    endCallPhrases: ["The interview is complete"] as unknown as CreateAssistantDTO["endCallPhrases"],
     maxDurationSeconds: 150,
   };
 }
@@ -82,8 +89,8 @@ export function getFounderInterviewAssistant(): CreateAssistantDTO {
   return {
     ...SHARED_VAPI_CONFIG,
     model: {
-      provider: "anthropic",
-      model: "claude-sonnet-4-20250514",
+      provider: "google",
+      model: "gemini-2.0-flash",
       messages: [
         {
           role: "system",
@@ -98,14 +105,15 @@ Keep it conversational, ~5 minutes. Cover:
 7. Any deal-breakers?
 
 Ask follow-up questions to get specifics. Don't accept vague answers like "good communicator" — dig into what that means for them.
-When you have enough info, thank them and wrap up.`,
+When you have enough info, say: "Thanks so much — I have everything I need."`,
         },
       ],
       maxTokens: 300,
       temperature: 0.7,
-    },
+    } as CreateAssistantDTO["model"],
     firstMessage:
       "Hi there! I'm here to learn about the role you're hiring for so we can find the right match. Let's start — what position are you looking to fill?",
+    endCallPhrases: ["I have everything I need"] as unknown as CreateAssistantDTO["endCallPhrases"],
     maxDurationSeconds: 600,
   };
 }

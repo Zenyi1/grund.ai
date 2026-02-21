@@ -1,8 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createAdminClient } from "@/lib/supabase/server";
-
-// Uses the same ANTHROPIC_API_KEY already required for Vapi's Claude model
-const anthropic = new Anthropic();
 
 interface FounderProfile {
   id: string;
@@ -10,7 +7,6 @@ interface FounderProfile {
   role_description: string | null;
   required_skills: string[];
   preferred_skills: string[];
-  company_name?: string;
 }
 
 interface GeneratedQuestion {
@@ -21,32 +17,26 @@ interface GeneratedQuestion {
 const FALLBACK_QUESTION =
   "Design a URL shortener service like bit.ly. Walk me through your architecture, how you'd handle high traffic, and how you'd store and look up the mappings efficiently.";
 
+function getGemini() {
+  return new GoogleGenerativeAI(process.env.GEMINI_API_KEY!).getGenerativeModel({
+    model: "gemini-2.0-flash",
+  });
+}
+
 export async function extractSkillsFromTranscript(
   transcript: string
 ): Promise<string[]> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.warn("ANTHROPIC_API_KEY not set — skipping skill extraction");
+  if (!process.env.GEMINI_API_KEY) {
+    console.warn("GEMINI_API_KEY not set — skipping skill extraction");
     return [];
   }
 
   try {
-    const response = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 300,
-      messages: [
-        {
-          role: "user",
-          content: `Extract the technical skills mentioned or clearly implied in this interview transcript. Return ONLY a JSON array of lowercase skill strings. No explanation.
-
-Transcript:
-${transcript}`,
-        },
-      ],
-    });
-
-    const text =
-      response.content[0].type === "text" ? response.content[0].text : "";
-
+    const model = getGemini();
+    const result = await model.generateContent(
+      `Extract the technical skills mentioned or clearly implied in this interview transcript. Return ONLY a JSON array of lowercase skill strings. No explanation.\n\nTranscript:\n${transcript}`
+    );
+    const text = result.response.text();
     const match = text.match(/\[[\s\S]*\]/);
     if (match) {
       return JSON.parse(match[0]) as string[];
@@ -65,33 +55,20 @@ async function findMatchingFounderProfiles(
 
   try {
     const supabase = createAdminClient();
-
     const { data: profiles, error } = await supabase
       .from("founder_profiles")
-      .select(
-        "id, role_title, role_description, required_skills, preferred_skills, founder_id"
-      );
+      .select("id, role_title, role_description, required_skills, preferred_skills");
 
-    if (error || !profiles || profiles.length === 0) {
-      return [];
-    }
+    if (error || !profiles || profiles.length === 0) return [];
 
     const normalizedCandidate = candidateSkills.map((s) => s.toLowerCase());
 
     const scored = profiles.map((profile) => {
-      const required = (profile.required_skills || []).map((s: string) =>
-        s.toLowerCase()
-      );
-      const preferred = (profile.preferred_skills || []).map((s: string) =>
-        s.toLowerCase()
-      );
+      const required = (profile.required_skills || []).map((s: string) => s.toLowerCase());
+      const preferred = (profile.preferred_skills || []).map((s: string) => s.toLowerCase());
 
-      const requiredOverlap = required.filter((s: string) =>
-        normalizedCandidate.includes(s)
-      ).length;
-      const preferredOverlap = preferred.filter((s: string) =>
-        normalizedCandidate.includes(s)
-      ).length;
+      const requiredOverlap = required.filter((s: string) => normalizedCandidate.includes(s)).length;
+      const preferredOverlap = preferred.filter((s: string) => normalizedCandidate.includes(s)).length;
 
       const score =
         requiredOverlap * 2 +
@@ -102,11 +79,7 @@ async function findMatchingFounderProfiles(
     });
 
     scored.sort((a, b) => b.score - a.score);
-
-    return scored
-      .filter((s) => s.score > 0)
-      .slice(0, 3)
-      .map((s) => s.profile as FounderProfile);
+    return scored.filter((s) => s.score > 0).slice(0, 3).map((s) => s.profile as FounderProfile);
   } catch (err) {
     console.error("Failed to fetch founder profiles:", err);
     return [];
@@ -117,8 +90,8 @@ export async function generateSystemDesignQuestion(
   transcript: string,
   candidateSkills: string[]
 ): Promise<GeneratedQuestion> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.warn("ANTHROPIC_API_KEY not set — using fallback question");
+  if (!process.env.GEMINI_API_KEY) {
+    console.warn("GEMINI_API_KEY not set — using fallback question");
     return { question: FALLBACK_QUESTION, matchedFounderProfileId: null };
   }
 
@@ -131,20 +104,16 @@ export async function generateSystemDesignQuestion(
     const top = matchingProfiles[0];
     matchedProfileId = top.id;
     founderContext = `
-The candidate may be a good fit for a role: ${top.role_title || "Software Engineer"}.
+The candidate may be a good fit for: ${top.role_title || "Software Engineer"}.
 Role description: ${top.role_description || "N/A"}
-Required skills for this role: ${top.required_skills?.join(", ") || "N/A"}
+Required skills: ${top.required_skills?.join(", ") || "N/A"}
 Preferred skills: ${top.preferred_skills?.join(", ") || "N/A"}`;
   }
 
   try {
-    const response = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 300,
-      messages: [
-        {
-          role: "user",
-          content: `Generate a system design interview question based on:
+    const model = getGemini();
+    const result = await model.generateContent(
+      `Generate a system design interview question based on:
 
 Candidate skills: ${candidateSkills.join(", ") || "general software engineering"}
 ${founderContext}
@@ -156,17 +125,11 @@ The question should:
 4. Be discussable in ~2.5 minutes
 5. Have natural follow-up probes
 
-Return ONLY the question text. No preamble, no explanation. Just the question itself (1-2 sentences).`,
-        },
-      ],
-    });
+Return ONLY the question text. No preamble, no explanation. 1-2 sentences max.`
+    );
 
-    const question =
-      response.content[0].type === "text"
-        ? response.content[0].text.trim()
-        : FALLBACK_QUESTION;
-
-    return { question, matchedFounderProfileId: matchedProfileId };
+    const question = result.response.text().trim();
+    return { question: question || FALLBACK_QUESTION, matchedFounderProfileId: matchedProfileId };
   } catch (err) {
     console.error("Question generation failed, using fallback:", err);
     return { question: FALLBACK_QUESTION, matchedFounderProfileId: null };

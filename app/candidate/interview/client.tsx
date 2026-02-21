@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { VapiCall } from "@/components/interview/vapi-call";
 import {
   getCandidateBehavioralAssistant,
   getCandidateSystemDesignAssistant,
 } from "@/lib/vapi/assistants";
+import { resetVapi } from "@/lib/vapi/client";
 import { Card, CardContent } from "@/components/ui/card";
 
 type InterviewPhase =
@@ -21,6 +22,9 @@ interface CandidateInterviewClientProps {
   existingQuestion?: string;
 }
 
+const FALLBACK_QUESTION =
+  "Design a URL shortener service like bit.ly. Walk me through your architecture, how you'd handle high traffic, and how you'd store and look up the mappings.";
+
 export function CandidateInterviewClient({
   candidateId,
   resumePhase,
@@ -33,59 +37,65 @@ export function CandidateInterviewClient({
   const [systemDesignQuestion, setSystemDesignQuestion] = useState<string>(
     existingQuestion ?? ""
   );
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [generatingError, setGeneratingError] = useState<string | null>(null);
 
-  const stopPolling = useCallback(() => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    return () => stopPolling();
-  }, [stopPolling]);
-
-  const startPollingForQuestion = useCallback(() => {
-    let attempts = 0;
-    const maxAttempts = 60;
-
-    pollingRef.current = setInterval(async () => {
-      attempts++;
-      if (attempts > maxAttempts) {
-        stopPolling();
-        console.error("Question generation timed out");
-        return;
-      }
+  const handlePhase1End = useCallback(
+    async (transcriptText: string) => {
+      setPhase("generating");
+      setGeneratingError(null);
 
       try {
-        const res = await fetch(
-          `/api/interview/candidate/question?candidateId=${candidateId}`
-        );
-        const data = await res.json();
+        const res = await fetch("/api/interview/candidate/submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            phase: "1",
+            candidateId,
+            transcript: transcriptText,
+          }),
+        });
 
-        if (data.ready && data.question) {
-          stopPolling();
-          setSystemDesignQuestion(data.question);
-          setPhase("phase2");
-        }
+        const data = await res.json() as { question?: string; error?: string };
+        const question = data.question ?? FALLBACK_QUESTION;
+
+        resetVapi();
+        setSystemDesignQuestion(question);
+        setPhase("phase2");
       } catch (err) {
-        console.error("Polling error:", err);
+        console.error("Phase 1 submission failed:", err);
+        // Use fallback so the interview can still proceed
+        resetVapi();
+        setSystemDesignQuestion(FALLBACK_QUESTION);
+        setPhase("phase2");
       }
-    }, 2000);
-  }, [candidateId, stopPolling]);
+    },
+    [candidateId]
+  );
 
-  const handlePhase1End = useCallback(() => {
-    setPhase("generating");
-    startPollingForQuestion();
-  }, [startPollingForQuestion]);
+  const handlePhase2End = useCallback(
+    async (transcriptText: string) => {
+      setPhase("complete");
 
-  const handlePhase2End = useCallback(() => {
-    setPhase("complete");
-    setTimeout(() => {
-      router.refresh();
-    }, 3000);
-  }, [router]);
+      try {
+        await fetch("/api/interview/candidate/submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            phase: "2",
+            candidateId,
+            transcript: transcriptText,
+          }),
+        });
+      } catch (err) {
+        console.error("Phase 2 submission failed:", err);
+      }
+
+      setTimeout(() => {
+        router.refresh();
+      }, 2000);
+    },
+    [candidateId, router]
+  );
 
   const phase1Config = getCandidateBehavioralAssistant();
   if (phase1Config.metadata === undefined) {
@@ -142,19 +152,21 @@ export function CandidateInterviewClient({
                 Preparing your technical challenge
               </h3>
               <p className="text-sm text-gray-500 max-w-md mx-auto">
-                We&apos;re crafting a system design question based on your
-                background and the roles we&apos;re matching you with. This
-                takes a few seconds.
+                Crafting a system design question based on your background.
+                {generatingError && (
+                  <span className="block text-red-500 mt-2">{generatingError}</span>
+                )}
               </p>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Phase 2: System Design */}
+      {/* Phase 2: System Design — auto-starts, no button needed */}
       {phase === "phase2" && systemDesignQuestion && (
         <VapiCall
           key="phase2"
+          autoStart
           assistantConfig={(() => {
             const config =
               getCandidateSystemDesignAssistant(systemDesignQuestion);

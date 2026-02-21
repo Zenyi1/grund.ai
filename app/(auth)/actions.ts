@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 
 export async function login(_: unknown, formData: FormData) {
   const supabase = await createClient();
@@ -70,25 +70,21 @@ export async function completeOnboarding(_: unknown, formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // If a profile already exists (e.g. user navigated back to /onboarding),
-  // just redirect to the right place instead of attempting a duplicate insert.
-  const { data: existingFounder } = await supabase
-    .from("founders")
-    .select("id")
-    .eq("id", user.id)
-    .single();
-  if (existingFounder) redirect("/founder/dashboard");
-
-  const { data: existingCandidate } = await supabase
-    .from("candidates")
-    .select("id")
-    .eq("id", user.id)
-    .single();
-  if (existingCandidate) redirect("/candidate/interview");
-
   const role = formData.get("role") as string;
 
+  // If a profile already exists for the selected role (e.g. user navigated back
+  // to /onboarding), just redirect instead of attempting a duplicate insert.
+  // Check is scoped to the selected role so a founder record never blocks a
+  // candidate submission and vice versa.
+
   if (role === "founder") {
+    const { data: existing } = await supabase
+      .from("founders")
+      .select("id")
+      .eq("id", user.id)
+      .single();
+    if (existing) redirect("/founder/dashboard");
+
     const { error } = await supabase.from("founders").insert({
       id: user.id,
       full_name: formData.get("full_name") as string,
@@ -101,11 +97,38 @@ export async function completeOnboarding(_: unknown, formData: FormData) {
   }
 
   if (role === "candidate") {
+    const { data: existing } = await supabase
+      .from("candidates")
+      .select("id")
+      .eq("id", user.id)
+      .single();
+    if (existing) redirect("/candidate/interview");
+
+    let cvUrl: string | null = null;
+    const cvFile = formData.get("cv_file") as File | null;
+    if (cvFile && cvFile.size > 0) {
+      try {
+        const admin = createAdminClient();
+        const ext = cvFile.name.split(".").pop()?.toLowerCase() ?? "pdf";
+        const filename = `${user.id}-${Date.now()}.${ext}`;
+        const bytes = await cvFile.arrayBuffer();
+        const { data: uploadData } = await admin.storage
+          .from("resumes")
+          .upload(filename, bytes, { contentType: cvFile.type });
+        if (uploadData) {
+          cvUrl = uploadData.path;
+        }
+      } catch (err) {
+        console.error("CV upload failed (non-blocking):", err);
+      }
+    }
+
     const { error } = await supabase.from("candidates").insert({
       id: user.id,
       full_name: formData.get("full_name") as string,
       email: user.email!,
       linkedin_url: (formData.get("linkedin_url") as string) || null,
+      cv_url: cvUrl,
     });
     if (error) return { error: error.message };
     redirect("/candidate/interview");

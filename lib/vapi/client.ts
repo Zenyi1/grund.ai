@@ -8,3 +8,16 @@ export function getVapi(): Vapi {
   }
   return vapiInstance;
 }
+
+/** Destroy the current singleton so the next getVapi() call returns a fresh instance.
+ *  Call this between interview phases to avoid "ejected" state errors. */
+export function resetVapi(): void {
+  if (vapiInstance) {
+    try {
+      vapiInstance.stop();
+    } catch {
+      // Already stopped — ignore
+    }
+    vapiInstance = null;
+  }
+}

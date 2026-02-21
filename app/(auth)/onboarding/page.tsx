@@ -80,7 +80,7 @@ export default function OnboardingPage() {
             </CardDescription>
           </CardHeader>
 
-          <form action={formAction}>
+          <form action={formAction} encType="multipart/form-data">
             <input type="hidden" name="role" value={role} />
 
             <CardContent className="space-y-4">
@@ -138,18 +138,35 @@ export default function OnboardingPage() {
               )}
 
               {role === "candidate" && (
-                <div className="space-y-2">
-                  <Label htmlFor="linkedin_url">
-                    LinkedIn URL{" "}
-                    <span className="text-muted-foreground">(optional)</span>
-                  </Label>
-                  <Input
-                    id="linkedin_url"
-                    name="linkedin_url"
-                    type="url"
-                    placeholder="https://linkedin.com/in/yourname"
-                  />
-                </div>
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="linkedin_url">
+                      LinkedIn URL{" "}
+                      <span className="text-muted-foreground">(optional)</span>
+                    </Label>
+                    <Input
+                      id="linkedin_url"
+                      name="linkedin_url"
+                      type="url"
+                      placeholder="https://linkedin.com/in/yourname"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cv_file">
+                      Resume / CV{" "}
+                      <span className="text-muted-foreground">(optional)</span>
+                    </Label>
+                    <Input
+                      id="cv_file"
+                      name="cv_file"
+                      type="file"
+                      accept=".pdf,.doc,.docx"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      PDF, DOC, or DOCX accepted.
+                    </p>
+                  </div>
+                </>
               )}
             </CardContent>
 

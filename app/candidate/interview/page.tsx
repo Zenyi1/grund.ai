@@ -64,16 +64,6 @@ export default async function CandidateInterviewPage() {
                 </dd>
               </div>
             )}
-            {existingProfile.overall_score != null && (
-              <div>
-                <dt className="text-sm font-medium text-gray-500">
-                  Overall Score
-                </dt>
-                <dd className="text-2xl font-bold text-gray-900">
-                  {existingProfile.overall_score}/10
-                </dd>
-              </div>
-            )}
           </dl>
           <p className="text-xs text-gray-400 mt-6">
             Your results are being matched with founders. You&apos;ll receive

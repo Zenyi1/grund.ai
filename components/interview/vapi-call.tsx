@@ -15,10 +15,13 @@ interface TranscriptEntry {
 
 interface VapiCallProps {
   assistantConfig: CreateAssistantDTO;
-  onCallEnd?: () => void;
+  /** Called when the call ends. Receives the full transcript as plain text. */
+  onCallEnd?: (transcriptText: string) => void;
+  /** When true, the call starts automatically on mount (no button needed). */
+  autoStart?: boolean;
 }
 
-export function VapiCall({ assistantConfig, onCallEnd }: VapiCallProps) {
+export function VapiCall({ assistantConfig, onCallEnd, autoStart = false }: VapiCallProps) {
   const [status, setStatus] = useState<CallStatus>("idle");
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [isMuted, setIsMuted] = useState(false);
@@ -32,8 +35,13 @@ export function VapiCall({ assistantConfig, onCallEnd }: VapiCallProps) {
   }, [onCallEnd]);
 
   // Track whether this component instance actually started a call.
-  // Prevents leftover "call-end" events from a previous phase from firing onCallEnd.
+  // Prevents leftover "call-end" from a previous phase firing onCallEnd.
   const callStartedRef = useRef(false);
+  // Suppress errors that fire after the call has ended (Vapi cleanup noise).
+  const callEndedRef = useRef(false);
+
+  // Mirror transcript state in a ref so the listener closure can read it
+  const transcriptRef = useRef<TranscriptEntry[]>([]);
 
   const scrollToBottom = useCallback(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -43,6 +51,7 @@ export function VapiCall({ assistantConfig, onCallEnd }: VapiCallProps) {
     scrollToBottom();
   }, [transcript, scrollToBottom]);
 
+  // Register Vapi event listeners once per component mount
   useEffect(() => {
     const vapi = getVapi();
 
@@ -52,11 +61,14 @@ export function VapiCall({ assistantConfig, onCallEnd }: VapiCallProps) {
     };
 
     const handleCallEnd = () => {
-      // Ignore call-end if we never started — avoids picking up leftover events
-      // from the previous phase on the shared singleton Vapi instance
       if (!callStartedRef.current) return;
+      callEndedRef.current = true;
       setStatus("ended");
-      onCallEndRef.current?.();
+      // Build plain-text transcript and pass it to the callback
+      const transcriptText = transcriptRef.current
+        .map((e) => `${e.role}: ${e.text}`)
+        .join("\n");
+      onCallEndRef.current?.(transcriptText);
     };
 
     const handleVolumeLevel = (volume: number) => {
@@ -71,19 +83,25 @@ export function VapiCall({ assistantConfig, onCallEnd }: VapiCallProps) {
         const text = message.transcript as string;
         const role = message.role as "assistant" | "user";
         setTranscript((prev) => {
-          // Deduplicate: skip if the last entry is identical (StrictMode double-fire guard)
+          // Deduplicate: skip if the last entry is identical
           const last = prev[prev.length - 1];
           if (last && last.role === role && last.text === text) return prev;
-          return [...prev, { role, text }];
+          const next = [...prev, { role, text }];
+          transcriptRef.current = next; // keep ref in sync for the call-end handler
+          return next;
         });
       }
     };
 
     const handleError = (error: unknown) => {
+      // Suppress all errors once the call has ended (Vapi cleanup noise)
+      if (callEndedRef.current) return;
+      // "Meeting ended due to ejection" is normal when maxDurationSeconds is hit
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes("ejection") || msg.includes("Meeting has ended")) return;
       console.error("Vapi error:", error);
     };
 
-    // Register named handlers so we can remove them precisely
     vapi.on("call-start", handleCallStart);
     vapi.on("call-end", handleCallEnd);
     vapi.on("volume-level", handleVolumeLevel);
@@ -91,19 +109,19 @@ export function VapiCall({ assistantConfig, onCallEnd }: VapiCallProps) {
     vapi.on("error", handleError);
 
     return () => {
-      // Remove only our handlers — don't wipe listeners from other components
       vapi.off("call-start", handleCallStart);
       vapi.off("call-end", handleCallEnd);
       vapi.off("volume-level", handleVolumeLevel);
       vapi.off("message", handleMessage);
       vapi.off("error", handleError);
     };
-  }, []); // Empty deps: register once per component instance
+  }, []); // Run once per component instance
 
-  const startCall = async () => {
+  const startCall = useCallback(async () => {
     setStatus("connecting");
     setTranscript([]);
-    callStartedRef.current = false; // reset before starting
+    callStartedRef.current = false;
+    callEndedRef.current = false;
     try {
       const vapi = getVapi();
       await vapi.start(assistantConfig);
@@ -111,7 +129,14 @@ export function VapiCall({ assistantConfig, onCallEnd }: VapiCallProps) {
       console.error("Failed to start call:", err);
       setStatus("idle");
     }
-  };
+  }, [assistantConfig]);
+
+  // Auto-start: fire startCall shortly after mount (gives Vapi time to initialize)
+  useEffect(() => {
+    if (!autoStart) return;
+    const timer = setTimeout(startCall, 600);
+    return () => clearTimeout(timer);
+  }, [autoStart, startCall]);
 
   const endCall = async () => {
     const vapi = getVapi();
@@ -146,7 +171,7 @@ export function VapiCall({ assistantConfig, onCallEnd }: VapiCallProps) {
                   }`}
                 />
                 <span className="text-sm font-medium text-gray-700">
-                  {status === "idle" && "Ready to start"}
+                  {status === "idle" && (autoStart ? "Starting..." : "Ready to start")}
                   {status === "connecting" && "Connecting..."}
                   {status === "active" && "Interview in progress"}
                   {status === "ended" && "Interview complete"}
@@ -182,7 +207,8 @@ export function VapiCall({ assistantConfig, onCallEnd }: VapiCallProps) {
                 </Button>
               )}
 
-              {status === "idle" && (
+              {/* Only show Start button when not auto-starting */}
+              {status === "idle" && !autoStart && (
                 <Button onClick={startCall}>Start Interview</Button>
               )}
 
@@ -239,8 +265,8 @@ export function VapiCall({ assistantConfig, onCallEnd }: VapiCallProps) {
         </Card>
       )}
 
-      {/* Instructions when idle */}
-      {status === "idle" && (
+      {/* Instructions when idle and not auto-starting */}
+      {status === "idle" && !autoStart && (
         <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center">
           <p className="text-gray-500 text-sm mb-2">
             This interview takes about 5 minutes total — a quick background
