@@ -59,7 +59,7 @@ export function getCandidateBehavioralAssistant(): CreateAssistantDTO {
       "What type of role are you looking for, and what's your background?",
     // Vapi ends the call automatically when the assistant speaks this phrase
     endCallPhrases: ["Stand by while I prepare your technical question"] as unknown as CreateAssistantDTO["endCallPhrases"],
-    maxDurationSeconds: 150,
+    maxDurationSeconds: 240,
   };
 }
 
@@ -80,7 +80,7 @@ export function getCandidateSystemDesignAssistant(
     firstMessage: `Here's your challenge: ${question} Take a moment if you need, then walk me through how you'd approach it.`,
     // Vapi ends the call automatically when the assistant speaks this phrase
     endCallPhrases: ["The interview is complete"] as unknown as CreateAssistantDTO["endCallPhrases"],
-    maxDurationSeconds: 150,
+    maxDurationSeconds: 240,
   };
 }
 
