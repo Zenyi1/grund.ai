@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import DashboardClient from "./dashboard-client";
 
 export default async function FounderDashboardPage() {
@@ -39,8 +39,13 @@ export default async function FounderDashboardPage() {
     );
   }
 
+  // Use admin client for nested join — candidate_profiles/candidates RLS would block
+  // a founder from reading another user's rows. Scope is safely locked server-side
+  // to this founder's own profile id.
+  const admin = createAdminClient();
+
   // Fetch all match scores for this profile with nested candidate data
-  const { data: matches } = await supabase
+  const { data: matches } = await admin
     .from("match_scores")
     .select(
       `
