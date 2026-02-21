@@ -138,15 +138,13 @@ export default function OnboardingForm() {
               {role === "candidate" && (
                 <>
                   <div className="space-y-2">
-                    <Label htmlFor="linkedin_url">
-                      LinkedIn URL{" "}
-                      <span className="text-muted-foreground">(optional)</span>
-                    </Label>
+                    <Label htmlFor="linkedin_url">LinkedIn URL</Label>
                     <Input
                       id="linkedin_url"
                       name="linkedin_url"
                       type="url"
                       placeholder="https://linkedin.com/in/yourname"
+                      required
                     />
                   </div>
                   <div className="space-y-2">

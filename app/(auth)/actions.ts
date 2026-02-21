@@ -140,11 +140,14 @@ export async function completeOnboarding(_: unknown, formData: FormData) {
       }
     }
 
+    const linkedinUrl = (formData.get("linkedin_url") as string).trim();
+    if (!linkedinUrl) return { error: "LinkedIn URL is required." };
+
     const { error } = await supabase.from("candidates").insert({
       id: user.id,
       full_name: formData.get("full_name") as string,
       email: user.email!,
-      linkedin_url: (formData.get("linkedin_url") as string) || null,
+      linkedin_url: linkedinUrl,
       cv_url: cvUrl,
     });
     if (error) return { error: error.message };
