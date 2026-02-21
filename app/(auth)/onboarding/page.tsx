@@ -80,7 +80,7 @@ export default function OnboardingPage() {
             </CardDescription>
           </CardHeader>
 
-          <form action={formAction} encType="multipart/form-data">
+          <form action={formAction}>
             <input type="hidden" name="role" value={role} />
 
             <CardContent className="space-y-4">
