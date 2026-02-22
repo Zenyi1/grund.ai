@@ -1,5 +1,12 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+export interface FounderRoleContext {
+  role_title: string | null;
+  role_description: string | null;
+  required_skills: string[];
+  preferred_skills: string[];
+}
+
 export interface CandidateEvaluation {
   behavioral_summary: string;
   behavioral_score: number;
@@ -63,4 +70,50 @@ ${combinedTranscript}`
     console.error("Evaluation failed:", err);
     return null;
   }
+}
+
+/**
+ * Scores how technically relevant and capable a candidate is for a specific founder's role.
+ * Returns 0-10. Called once per founder profile in the matching engine.
+ */
+export async function evaluateTechnicalRelevance(
+  transcript: string,
+  role: FounderRoleContext
+): Promise<number> {
+  if (!process.env.GEMINI_API_KEY) return 5;
+
+  try {
+    const model = getGemini();
+    const result = await model.generateContent(
+      `You are evaluating how technically relevant and capable a candidate is for a specific open role.
+
+Role: ${role.role_title ?? "open role"}
+Required skills: ${role.required_skills.join(", ") || "not specified"}
+Preferred skills: ${role.preferred_skills.join(", ") || "not specified"}
+Role description: ${role.role_description ?? "not provided"}
+
+Candidate interview transcript (behavioral + technical challenge):
+${transcript.slice(0, 4000)}
+
+Score 0–10 how well this candidate's demonstrated knowledge, depth of experience, and problem-solving aligns with the specific needs of this role.
+Weight skill depth and relevance heavily — surface mentions of a skill count less than demonstrated fluency.
+A candidate whose skills exactly match and who answered the technical challenge well for this domain should score 8–10.
+
+Return ONLY valid JSON with no extra text: {"score": <number 0-10>}`
+    );
+
+    const text = result.response.text();
+    const match = text.match(/\{[\s\S]*?\}/);
+    if (match) {
+      const parsed = JSON.parse(match[0]);
+      if (typeof parsed.score === "number") {
+        return Math.min(10, Math.max(0, Math.round(parsed.score * 10) / 10));
+      }
+    }
+  } catch (err) {
+    console.error("evaluateTechnicalRelevance failed:", err);
+  }
+
+  // Fallback: use a neutral score rather than blocking the match
+  return 5;
 }

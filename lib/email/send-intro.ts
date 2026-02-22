@@ -50,7 +50,7 @@ export async function sendIntroEmails(params: IntroParams) {
     ? `${candidateExperienceYears} year${candidateExperienceYears !== 1 ? "s" : ""} of experience`
     : null;
 
-  const FROM = `FounderMatch <${process.env.GMAIL_USER}>`;
+  const FROM = `cracked.ai <${process.env.GMAIL_USER}>`;
 
   // ── Email to founder ──────────────────────────────────────────────────────
   const founderHtml = `

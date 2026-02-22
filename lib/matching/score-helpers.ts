@@ -22,9 +22,9 @@ export function calcSkillMatchScore(
 
   let score: number;
   if (matchedRequired.length === r.length) {
-    score = 7;
+    score = 7.7;
   } else if (matchedRequired.length > 0) {
-    score = (matchedRequired.length / r.length) * 7;
+    score = (matchedRequired.length / r.length) * 7.7;
   } else {
     score = 0;
   }
@@ -51,7 +51,7 @@ export function calcExperienceMatchScore(
   const diff = cIdx - fIdx;
   if (diff === 0) return 10;
   if (diff === 1) return 8;  // one level above — overqualified but fine
-  if (diff === -1) return 5; // one level below — stretch
+  if (diff === -1) return 6; // one level below — stretch
   return 2;                   // two+ levels off
 }
 
